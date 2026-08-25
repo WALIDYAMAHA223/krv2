@@ -1,10 +1,5 @@
-// KratosBio Real-Time Cloud Sync Module v3
-// Powered by High-Speed PubSub SSE (ntfy.sh) + Polling Fallback + Local Storage
-
-const TOPIC = 'kratosbio_config_sync_v3'
-const PUBLISH_URL = `https://ntfy.sh/${TOPIC}`
-const POLL_URL = `https://ntfy.sh/${TOPIC}/json?poll=1`
-const SSE_URL = `https://ntfy.sh/${TOPIC}/sse`
+// KratosBio Real-Time Cloud Sync System v5
+// Powered by Vercel Serverless Sync API (/api/sync) + LocalStorage + Focus Events
 
 let lastSyncTimestamp = 0
 
@@ -71,19 +66,30 @@ export const pushCloudState = async (updates = {}) => {
   // Update local storage and dispatch events for current tab
   broadcastLocalUpdates(updates)
 
-  // Push to Cloud API (ntfy.sh)
+  // Push to Vercel Serverless Sync API (/api/sync)
   try {
-    const res = await fetch(PUBLISH_URL, {
+    await fetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newBundle)
     })
-    if (!res.ok) {
-      console.warn('Cloud sync push status:', res.status)
-    }
   } catch (err) {
     console.warn('Cloud sync push error:', err)
   }
+
+  // Backup push to paste.rs
+  try {
+    const backupRes = await fetch('https://paste.rs', {
+      method: 'POST',
+      body: JSON.stringify(newBundle)
+    })
+    if (backupRes.ok) {
+      const backupUrl = await backupRes.text()
+      if (backupUrl && backupUrl.trim()) {
+        setLocalStore('kratos_backup_url', backupUrl.trim())
+      }
+    }
+  } catch (e) {}
 }
 
 // Process cloud payload
@@ -122,78 +128,62 @@ const applyCloudPayload = (cloudData, onUpdateCallbacks = {}) => {
 
 // Pull latest global bundle from Cloud
 export const fetchCloudState = async (onUpdateCallbacks = {}) => {
+  // First try Vercel Sync API
   try {
-    const res = await fetch(POLL_URL, { cache: 'no-store' })
-    if (!res.ok) return null
-
-    const text = await res.text()
-    if (!text || !text.trim()) return null
-
-    const lines = text.trim().split('\n').filter(Boolean)
-    const validMsgs = []
-
-    for (const l of lines) {
-      try {
-        const obj = JSON.parse(l)
-        if (obj.event === 'message' && obj.message) {
-          const payload = typeof obj.message === 'string' ? JSON.parse(obj.message) : obj.message
-          if (payload && payload.lastUpdated) validMsgs.push(payload)
-        }
-      } catch (e) {
-        // Skip unparseable lines
+    const res = await fetch('/api/sync', { cache: 'no-store' })
+    if (res.ok) {
+      const data = await res.json()
+      if (data && data.lastUpdated) {
+        applyCloudPayload(data, onUpdateCallbacks)
+        return data
       }
     }
+  } catch (err) {}
 
-    if (validMsgs.length === 0) return null
+  // Secondary fallback: paste.rs backup URL if saved
+  try {
+    const backupUrl = getLocalStore('kratos_backup_url', null)
+    if (backupUrl) {
+      const res = await fetch(backupUrl, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data && data.lastUpdated) {
+          applyCloudPayload(data, onUpdateCallbacks)
+          return data
+        }
+      }
+    }
+  } catch (e) {}
 
-    // Sort by lastUpdated ascending and pick latest
-    validMsgs.sort((a, b) => a.lastUpdated - b.lastUpdated)
-    const latest = validMsgs[validMsgs.length - 1]
-
-    applyCloudPayload(latest, onUpdateCallbacks)
-    return latest
-  } catch (err) {
-    console.warn('Cloud sync fetch error:', err)
-  }
   return null
 }
 
-// Start real-time SSE listener + fallback polling
-export const startCloudSyncLoop = (onUpdateCallbacks = {}, intervalMs = 6000) => {
-  // Initial fetch immediately
+// Start real-time sync + focus listener
+export const startCloudSyncLoop = (onUpdateCallbacks = {}, intervalMs = 4000) => {
+  // Fetch immediately on mount
   fetchCloudState(onUpdateCallbacks)
 
-  // Real-time EventSource (SSE) for instant zero-latency updates
-  let eventSource = null
-  if (typeof window !== 'undefined' && window.EventSource) {
-    try {
-      eventSource = new EventSource(SSE_URL)
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          if (data && data.message) {
-            const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message
-            applyCloudPayload(payload, onUpdateCallbacks)
-          }
-        } catch (e) {
-          console.warn('SSE message parse error:', e)
-        }
-      }
-      eventSource.onerror = (e) => {
-        // SSE temporary disconnect, fallback polling handles it
-      }
-    } catch (e) {
-      console.warn('EventSource initialization error:', e)
-    }
+  // Fetch when returning to tab / unlocking phone
+  const handleFocus = () => {
+    fetchCloudState(onUpdateCallbacks)
   }
 
-  // Polling loop as backup
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') handleFocus()
+    })
+  }
+
+  // Periodic polling interval
   const timer = setInterval(() => {
     fetchCloudState(onUpdateCallbacks)
   }, intervalMs)
 
   return () => {
     clearInterval(timer)
-    if (eventSource) eventSource.close()
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('focus', handleFocus)
+    }
   }
 }
