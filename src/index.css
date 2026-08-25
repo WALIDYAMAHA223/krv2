@@ -1,5 +1,16 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
+/* Mobile Touch Optimization & Latency Removal */
+html, body, button, a, input, select, textarea, nav, header {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 :root{
   --black:#0a0a0a;
   --black-soft:#141414;

@@ -20,8 +20,8 @@ export default function MolecularBackground() {
 
     window.addEventListener('resize', handleResize)
 
-    // Generate molecular nodes
-    const particleCount = Math.min(Math.floor(width / 35), 45)
+    const isMobile = width < 768
+    const particleCount = isMobile ? 12 : Math.min(Math.floor(width / 35), 45)
     const particles = []
 
     for (let i = 0; i < particleCount; i++) {
@@ -38,7 +38,7 @@ export default function MolecularBackground() {
     }
 
     // Floating background circles (ambient bioluminescent blobs)
-    const blobs = [
+    const blobs = isMobile ? [] : [
       { x: width * 0.15, y: height * 0.2, r: 250, vx: 0.15, vy: 0.1, color: 'rgba(74, 144, 217, 0.035)' },
       { x: width * 0.85, y: height * 0.6, r: 300, vx: -0.1, vy: 0.12, color: 'rgba(34, 197, 94, 0.025)' },
       { x: width * 0.5, y: height * 0.85, r: 220, vx: 0.1, vy: -0.15, color: 'rgba(74, 144, 217, 0.03)' }
@@ -48,6 +48,7 @@ export default function MolecularBackground() {
     let mouseY = height / 2
 
     const handleMouseMove = (e) => {
+      if (isMobile) return
       mouseX = e.clientX
       mouseY = e.clientY
     }

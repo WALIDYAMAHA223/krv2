@@ -159,7 +159,7 @@ export const fetchCloudState = async (onUpdateCallbacks = {}) => {
 }
 
 // Start real-time SSE listener + fallback polling
-export const startCloudSyncLoop = (onUpdateCallbacks = {}, intervalMs = 2500) => {
+export const startCloudSyncLoop = (onUpdateCallbacks = {}, intervalMs = 6000) => {
   // Initial fetch immediately
   fetchCloudState(onUpdateCallbacks)
 

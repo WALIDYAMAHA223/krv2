@@ -167,12 +167,11 @@ export default function Header({ onCartClick, cartCount, siteConfig }) {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
+            background: 'rgba(0,0,0,0.65)',
             zIndex: 999999,
             display: 'flex',
-            justifyContent: 'flex-end'
+            justifyContent: 'flex-end',
+            touchAction: 'manipulation'
           }}
         >
           <div 
@@ -186,7 +185,9 @@ export default function Header({ onCartClick, cartCount, siteConfig }) {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              boxShadow: '-10px 0 30px rgba(0,0,0,0.15)'
+              boxShadow: '-10px 0 30px rgba(0,0,0,0.15)',
+              transform: 'translateZ(0)',
+              willChange: 'transform'
             }}
           >
             <div>
@@ -197,30 +198,33 @@ export default function Header({ onCartClick, cartCount, siteConfig }) {
                 </span>
                 <button 
                   onClick={() => setMobileMenuOpen(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: 'var(--black)' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.4rem', color: 'var(--black)', touchAction: 'manipulation' }}
                 >
                   <CloseIcon />
                 </button>
               </div>
 
               {/* NAV LINKS LIST */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                 {navItems.map(item => (
                   <a 
                     key={item.label} 
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                    }}
                     style={{
                       fontSize: '0.95rem',
                       fontWeight: 800,
                       letterSpacing: '0.1em',
                       color: 'var(--black)',
                       textDecoration: 'none',
-                      padding: '0.6rem 0',
+                      padding: '0.75rem 0',
                       borderBottom: '1px solid #f8fafc',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between'
+                      justifyContent: 'space-between',
+                      touchAction: 'manipulation'
                     }}
                   >
                     <span>{item.label}</span>
