@@ -1,13 +1,17 @@
-// KratosBio Real-Time Cloud Sync Module
-// Uses restful-api.dev object store with local fallback for instant cross-device synchronization (PC, Mobile, Tablet)
+// KratosBio Real-Time Cloud Sync Module v3
+// Powered by High-Speed PubSub SSE (ntfy.sh) + Polling Fallback + Local Storage
 
-const CLOUD_ENDPOINT = 'https://api.restful-api.dev/objects/ff8081819ff5b11001a0379936bf1840'
+const TOPIC = 'kratosbio_config_sync_v3'
+const PUBLISH_URL = `https://ntfy.sh/${TOPIC}`
+const POLL_URL = `https://ntfy.sh/${TOPIC}/json?poll=1`
+const SSE_URL = `https://ntfy.sh/${TOPIC}/sse`
 
 let lastSyncTimestamp = 0
 
 // Helper to get local data safely
 export const getLocalStore = (key, defaultVal) => {
   try {
+    if (typeof localStorage === 'undefined') return defaultVal
     const saved = localStorage.getItem(key)
     return saved ? JSON.parse(saved) : defaultVal
   } catch (e) {
@@ -18,6 +22,7 @@ export const getLocalStore = (key, defaultVal) => {
 // Helper to set local data safely
 export const setLocalStore = (key, val) => {
   try {
+    if (typeof localStorage === 'undefined') return
     localStorage.setItem(key, JSON.stringify(val))
   } catch (e) {
     console.error('LocalStorage write error:', e)
@@ -33,7 +38,25 @@ export const getLocalBundle = () => {
   }
 }
 
-// Push local bundle to Cloud Endpoint for immediate global sync
+// Broadcast updates to local tabs & components
+const broadcastLocalUpdates = (updates) => {
+  if (typeof window === 'undefined') return
+
+  if (updates.siteConfig) {
+    setLocalStore('kratos_site_config', updates.siteConfig)
+    window.dispatchEvent(new CustomEvent('kratos_site_config_updated', { detail: updates.siteConfig }))
+  }
+  if (updates.reviews) {
+    setLocalStore('kratos_reviews', updates.reviews)
+    window.dispatchEvent(new CustomEvent('kratos_reviews_updated', { detail: updates.reviews }))
+  }
+  if (updates.salesHistory) {
+    setLocalStore('kratos_sales_history', updates.salesHistory)
+    window.dispatchEvent(new CustomEvent('kratos_sales_updated', { detail: updates.salesHistory }))
+  }
+}
+
+// Push state to Cloud for immediate global sync across all devices
 export const pushCloudState = async (updates = {}) => {
   const currentBundle = getLocalBundle()
   const newBundle = {
@@ -43,85 +66,134 @@ export const pushCloudState = async (updates = {}) => {
     lastUpdated: Date.now()
   }
 
-  // Save to local storage first
-  if (updates.siteConfig) setLocalStore('kratos_site_config', updates.siteConfig)
-  if (updates.reviews) setLocalStore('kratos_reviews', updates.reviews)
-  if (updates.salesHistory) setLocalStore('kratos_sales_history', updates.salesHistory)
-
   lastSyncTimestamp = newBundle.lastUpdated
 
-  // Dispatch local events so current tab updates immediately
-  if (updates.siteConfig) window.dispatchEvent(new CustomEvent('kratos_site_config_updated', { detail: updates.siteConfig }))
-  if (updates.reviews) window.dispatchEvent(new CustomEvent('kratos_reviews_updated', { detail: updates.reviews }))
-  if (updates.salesHistory) window.dispatchEvent(new CustomEvent('kratos_sales_updated', { detail: updates.salesHistory }))
+  // Update local storage and dispatch events for current tab
+  broadcastLocalUpdates(updates)
 
-  // Push to Cloud API
+  // Push to Cloud API (ntfy.sh)
   try {
-    const res = await fetch(CLOUD_ENDPOINT, {
-      method: 'PUT',
+    const res = await fetch(PUBLISH_URL, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'kratosbio_global_config_v2',
-        data: newBundle
-      })
+      body: JSON.stringify(newBundle)
     })
     if (!res.ok) {
-      console.warn('Cloud sync PUT status:', res.status)
+      console.warn('Cloud sync push status:', res.status)
     }
   } catch (err) {
-    console.warn('Cloud sync push offline/error:', err)
+    console.warn('Cloud sync push error:', err)
   }
 }
 
-// Pull latest global bundle from Cloud Endpoint
+// Process cloud payload
+const applyCloudPayload = (cloudData, onUpdateCallbacks = {}) => {
+  if (!cloudData || !cloudData.lastUpdated) return false
+  if (cloudData.lastUpdated <= lastSyncTimestamp) return false
+
+  lastSyncTimestamp = cloudData.lastUpdated
+
+  if (cloudData.siteConfig) {
+    setLocalStore('kratos_site_config', cloudData.siteConfig)
+    if (onUpdateCallbacks.onSiteConfig) onUpdateCallbacks.onSiteConfig(cloudData.siteConfig)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kratos_site_config_updated', { detail: cloudData.siteConfig }))
+    }
+  }
+
+  if (cloudData.reviews) {
+    setLocalStore('kratos_reviews', cloudData.reviews)
+    if (onUpdateCallbacks.onReviews) onUpdateCallbacks.onReviews(cloudData.reviews)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kratos_reviews_updated', { detail: cloudData.reviews }))
+    }
+  }
+
+  if (cloudData.salesHistory) {
+    setLocalStore('kratos_sales_history', cloudData.salesHistory)
+    if (onUpdateCallbacks.onSalesHistory) onUpdateCallbacks.onSalesHistory(cloudData.salesHistory)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kratos_sales_updated', { detail: cloudData.salesHistory }))
+    }
+  }
+
+  return true
+}
+
+// Pull latest global bundle from Cloud
 export const fetchCloudState = async (onUpdateCallbacks = {}) => {
   try {
-    const res = await fetch(CLOUD_ENDPOINT, { cache: 'no-store' })
+    const res = await fetch(POLL_URL, { cache: 'no-store' })
     if (!res.ok) return null
 
-    const json = await res.json()
-    const cloudData = json?.data
-    if (!cloudData || !cloudData.lastUpdated) return null
+    const text = await res.text()
+    if (!text || !text.trim()) return null
 
-    // Only update if cloud has newer data than our last sync
-    if (cloudData.lastUpdated > lastSyncTimestamp) {
-      lastSyncTimestamp = cloudData.lastUpdated
+    const lines = text.trim().split('\n').filter(Boolean)
+    const validMsgs = []
 
-      if (cloudData.siteConfig) {
-        setLocalStore('kratos_site_config', cloudData.siteConfig)
-        if (onUpdateCallbacks.onSiteConfig) onUpdateCallbacks.onSiteConfig(cloudData.siteConfig)
-        window.dispatchEvent(new CustomEvent('kratos_site_config_updated', { detail: cloudData.siteConfig }))
+    for (const l of lines) {
+      try {
+        const obj = JSON.parse(l)
+        if (obj.event === 'message' && obj.message) {
+          const payload = typeof obj.message === 'string' ? JSON.parse(obj.message) : obj.message
+          if (payload && payload.lastUpdated) validMsgs.push(payload)
+        }
+      } catch (e) {
+        // Skip unparseable lines
       }
-
-      if (cloudData.reviews) {
-        setLocalStore('kratos_reviews', cloudData.reviews)
-        if (onUpdateCallbacks.onReviews) onUpdateCallbacks.onReviews(cloudData.reviews)
-        window.dispatchEvent(new CustomEvent('kratos_reviews_updated', { detail: cloudData.reviews }))
-      }
-
-      if (cloudData.salesHistory) {
-        setLocalStore('kratos_sales_history', cloudData.salesHistory)
-        if (onUpdateCallbacks.onSalesHistory) onUpdateCallbacks.onSalesHistory(cloudData.salesHistory)
-        window.dispatchEvent(new CustomEvent('kratos_sales_updated', { detail: cloudData.salesHistory }))
-      }
-
-      return cloudData
     }
+
+    if (validMsgs.length === 0) return null
+
+    // Sort by lastUpdated ascending and pick latest
+    validMsgs.sort((a, b) => a.lastUpdated - b.lastUpdated)
+    const latest = validMsgs[validMsgs.length - 1]
+
+    applyCloudPayload(latest, onUpdateCallbacks)
+    return latest
   } catch (err) {
-    console.warn('Cloud sync pull offline/error:', err)
+    console.warn('Cloud sync fetch error:', err)
   }
   return null
 }
 
-// Auto-sync polling loop every 3 seconds
-export const startCloudSyncLoop = (onUpdateCallbacks = {}, intervalMs = 3000) => {
+// Start real-time SSE listener + fallback polling
+export const startCloudSyncLoop = (onUpdateCallbacks = {}, intervalMs = 2500) => {
   // Initial fetch immediately
   fetchCloudState(onUpdateCallbacks)
 
-  // Polling loop
+  // Real-time EventSource (SSE) for instant zero-latency updates
+  let eventSource = null
+  if (typeof window !== 'undefined' && window.EventSource) {
+    try {
+      eventSource = new EventSource(SSE_URL)
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data && data.message) {
+            const payload = typeof data.message === 'string' ? JSON.parse(data.message) : data.message
+            applyCloudPayload(payload, onUpdateCallbacks)
+          }
+        } catch (e) {
+          console.warn('SSE message parse error:', e)
+        }
+      }
+      eventSource.onerror = (e) => {
+        // SSE temporary disconnect, fallback polling handles it
+      }
+    } catch (e) {
+      console.warn('EventSource initialization error:', e)
+    }
+  }
+
+  // Polling loop as backup
   const timer = setInterval(() => {
     fetchCloudState(onUpdateCallbacks)
   }, intervalMs)
 
-  return () => clearInterval(timer)
+  return () => {
+    clearInterval(timer)
+    if (eventSource) eventSource.close()
+  }
 }
