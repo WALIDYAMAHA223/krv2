@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { pushCloudState } from '../utils/cloudSync'
 
 const CloseIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -626,8 +627,7 @@ export default function OrderModal({
                   grandTotal: grandTotal,
                   status: 'Confirmé (WhatsApp)'
                 }
-                localStorage.setItem('kratos_sales_history', JSON.stringify([newOrder, ...existingSales]))
-                window.dispatchEvent(new Event('kratos_sales_updated'))
+                pushCloudState({ salesHistory: [newOrder, ...existingSales] })
               } catch (err) {
                 console.error('Error saving order:', err)
               }

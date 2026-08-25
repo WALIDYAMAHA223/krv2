@@ -10,6 +10,7 @@ import DosageCalculator from './components/DosageCalculator'
 import Footer from './components/Footer'
 import OrderModal from './components/OrderModal'
 import AdminDashboard from './components/AdminDashboard'
+import { startCloudSyncLoop, pushCloudState } from './utils/cloudSync'
 
 const TargetIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -144,8 +145,16 @@ export default function App() {
 
   const updateSiteConfig = (newConfig) => {
     setSiteConfig(newConfig)
-    localStorage.setItem('kratos_site_config', JSON.stringify(newConfig))
+    pushCloudState({ siteConfig: newConfig })
   }
+
+  // Real-time Cloud Synchronization across PC, Mobile, and all visitors
+  useEffect(() => {
+    const stopSync = startCloudSyncLoop({
+      onSiteConfig: (newConf) => setSiteConfig(newConf)
+    }, 3000)
+    return () => stopSync()
+  }, [])
 
   // Keyboard shortcut for Admin: Ctrl + Shift + A
   useEffect(() => {

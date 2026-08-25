@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { pushCloudState } from '../utils/cloudSync'
 
 const LockIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -140,7 +141,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     const newConf = { ...config, promoCodes: updated }
     setConfig(newConf)
     if (onUpdateConfig) onUpdateConfig(newConf)
-    localStorage.setItem('kratos_site_config', JSON.stringify(newConf))
+    pushCloudState({ siteConfig: newConf })
     setNewPromoCode('')
     setNewPromoValue('')
     setSaveMessage('✓ Code promo créé avec succès !')
@@ -152,7 +153,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     const newConf = { ...config, promoCodes: updated }
     setConfig(newConf)
     if (onUpdateConfig) onUpdateConfig(newConf)
-    localStorage.setItem('kratos_site_config', JSON.stringify(newConf))
+    pushCloudState({ siteConfig: newConf })
   }
 
   const handleDeletePromo = (id) => {
@@ -160,7 +161,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     const newConf = { ...config, promoCodes: updated }
     setConfig(newConf)
     if (onUpdateConfig) onUpdateConfig(newConf)
-    localStorage.setItem('kratos_site_config', JSON.stringify(newConf))
+    pushCloudState({ siteConfig: newConf })
   }
 
   useEffect(() => {
@@ -205,7 +206,8 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
   }
 
   const handleSaveConfig = () => {
-    onUpdateConfig(config)
+    if (onUpdateConfig) onUpdateConfig(config)
+    pushCloudState({ siteConfig: config })
     setSaveMessage('✓ Modifications enregistrées avec succès !')
     setTimeout(() => setSaveMessage(''), 4000)
   }
@@ -213,29 +215,27 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
   const handleApproveReview = (id) => {
     const updated = reviews.map(r => r.id === id ? { ...r, status: 'approved' } : r)
     setReviews(updated)
-    localStorage.setItem('kratos_reviews', JSON.stringify(updated))
-    window.dispatchEvent(new Event('kratos_reviews_updated'))
+    pushCloudState({ reviews: updated })
   }
 
   const handleDeleteReview = (id) => {
     const updated = reviews.filter(r => r.id !== id)
     setReviews(updated)
-    localStorage.setItem('kratos_reviews', JSON.stringify(updated))
-    window.dispatchEvent(new Event('kratos_reviews_updated'))
+    pushCloudState({ reviews: updated })
   }
 
   const handleDeleteSale = (id) => {
     if (window.confirm('Voulez-vous supprimer cette commande de l\'historique des ventes ?')) {
       const updated = salesHistory.filter(s => s.id !== id)
       setSalesHistory(updated)
-      localStorage.setItem('kratos_sales_history', JSON.stringify(updated))
+      pushCloudState({ salesHistory: updated })
     }
   }
 
   const handleClearAllSales = () => {
     if (window.confirm('ÊTES-VOUS SÛR ? Cela va effacer tout l\'historique du chiffre d\'affaires.')) {
       setSalesHistory([])
-      localStorage.setItem('kratos_sales_history', JSON.stringify([]))
+      pushCloudState({ salesHistory: [] })
     }
   }
 
@@ -272,7 +272,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
 
     const updated = [newOrder, ...salesHistory]
     setSalesHistory(updated)
-    localStorage.setItem('kratos_sales_history', JSON.stringify(updated))
+    pushCloudState({ salesHistory: updated })
     setShowManualSaleModal(false)
   }
 
