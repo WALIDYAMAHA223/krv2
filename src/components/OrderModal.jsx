@@ -187,7 +187,8 @@ export default function OrderModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1rem'
+        padding: '0.75rem',
+        boxSizing: 'border-box'
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -195,424 +196,476 @@ export default function OrderModal({
         style={{
           background: '#ffffff',
           width: '100%',
-          maxWidth: '540px',
+          maxWidth: '520px',
+          maxHeight: 'calc(100dvh - 1.5rem)',
           borderRadius: '20px',
-          padding: '2rem 1.8rem',
+          display: 'flex',
+          flexDirection: 'column',
           boxShadow: '0 25px 60px rgba(0, 0, 0, 0.25)',
           position: 'relative',
-          border: '1px solid #e2e8f0'
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          boxSizing: 'border-box'
         }}
       >
-        {/* CLOSE BUTTON */}
-        <button 
-          onClick={onClose} 
+        {/* MODAL HEADER (PINNED AT TOP) */}
+        <div 
           style={{
-            position: 'absolute',
-            top: '1.2rem',
-            right: '1.2rem',
-            background: '#f1f5f9',
-            border: 'none',
-            borderRadius: '50%',
-            width: '34px',
-            height: '34px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: 'var(--black)',
-            transition: 'background 0.2s ease'
+            padding: '1.1rem 1.2rem 0.8rem',
+            borderBottom: '1px solid #f1f5f9',
+            position: 'relative',
+            flexShrink: 0,
+            background: '#ffffff'
           }}
-          aria-label="Fermer"
         >
-          <CloseIcon />
-        </button>
+          {/* CLOSE BUTTON */}
+          <button 
+            onClick={onClose} 
+            style={{
+              position: 'absolute',
+              top: '0.9rem',
+              right: '0.9rem',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '34px',
+              height: '34px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--black)',
+              transition: 'background 0.2s ease',
+              zIndex: 10
+            }}
+            aria-label="Fermer"
+          >
+            <CloseIcon />
+          </button>
 
-        {/* MODAL HEADER */}
-        <div style={{ marginBottom: '1.5rem', paddingRight: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ 
-              display: 'inline-block', 
-              background: '#f1f5f9', 
-              padding: '0.3rem 0.7rem', 
-              borderRadius: '6px', 
-              fontSize: '0.68rem', 
-              fontWeight: 800, 
-              letterSpacing: '0.12em',
-              color: 'var(--gray-600)',
-              marginBottom: '0.4rem'
-            }}>
-              🛒 VOTRE PANIER
+          <div style={{ paddingRight: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ 
+                display: 'inline-block', 
+                background: '#f1f5f9', 
+                padding: '0.25rem 0.6rem', 
+                borderRadius: '6px', 
+                fontSize: '0.65rem', 
+                fontWeight: 800, 
+                letterSpacing: '0.12em',
+                color: 'var(--gray-600)',
+                marginBottom: '0.3rem'
+              }}>
+                🛒 VOTRE PANIER
+              </div>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 0.2rem 0', color: 'var(--black)' }}>
+                RÉCAPITULATIF DE COMMANDE
+              </h2>
+              <p style={{ fontSize: '0.72rem', color: 'var(--gray-500)', margin: 0 }}>
+                Détail des fioles & eau bactériostatique • WhatsApp
+              </p>
             </div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 0.3rem 0', color: 'var(--black)' }}>
-              RÉCAPITULATIF DE COMMANDE
-            </h2>
-            <p style={{ fontSize: '0.76rem', color: 'var(--gray-500)', margin: 0 }}>
-              Détail des fioles & de l'eau bactériostatique • Validation directe WhatsApp
-            </p>
+
+            {cartItems.length > 0 && onClearCart && (
+              <button 
+                onClick={onClearCart}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ef4444',
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  padding: 0,
+                  textDecoration: 'underline',
+                  flexShrink: 0
+                }}
+              >
+                Vider
+              </button>
+            )}
           </div>
-
-          {cartItems.length > 0 && onClearCart && (
-            <button 
-              onClick={onClearCart}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#ef4444',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                padding: '0.4rem 0',
-                textDecoration: 'underline',
-                flexShrink: 0
-              }}
-            >
-              Vider le panier
-            </button>
-          )}
         </div>
 
-        {/* CART ITEMS LIST */}
-        <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '340px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-          {cartItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
-              <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--gray-600)', margin: '0 0 0.4rem 0' }}>
-                Votre panier est vide 🛒
-              </p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--gray-500)', margin: 0 }}>
-                Sélectionnez des articles pour débuter votre commande.
-              </p>
-            </div>
-          ) : (
-            cartItems.map((item, idx) => {
-              const ci = computedItems[idx]
-              const cleanDsg = formatCleanDosage(item.dosage)
-              return (
-                <div 
-                  key={idx} 
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.8rem',
-                    background: '#f8fafc',
-                    border: ci.hasPromo ? '1.5px solid #16a34a' : '1px solid #e2e8f0',
-                    borderRadius: '14px',
-                    padding: '1rem'
-                  }}
-                >
-                  {/* PROMO BADGE */}
-                  {ci.hasPromo && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#dcfce7', color: '#15803d', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
-                      <span>
-                        {ci.hasPackPromo 
-                          ? 'PROMO APPLIQUÉE : Pack 3 Fioles (-50% sur la 3ème fiole)' 
-                          : `PROMO APPLIQUÉE : Offre Spéciale (-${(ci.unpromotedPeptideCost - ci.peptideCost).toFixed(2).replace('.', ',')} €)`
-                        }
-                      </span>
-                    </div>
-                  )}
-
-                  {/* PEPTIDE ROW */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.8rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: 1, minWidth: 0 }}>
-                      <div style={{ 
-                        width: '44px', 
-                        height: '44px', 
-                        borderRadius: '8px', 
-                        background: '#ffffff', 
-                        border: '1px solid #cbd5e1', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        flexShrink: 0 
-                      }}>
-                        <img 
-                          src={ci.cleanName.includes('GHK') ? '/images/ghkcu.png' : '/images/reta.png'} 
-                          alt={ci.cleanName} 
-                          style={{ height: '36px', objectFit: 'contain' }}
-                        />
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                          <span style={{ fontSize: '0.92rem', fontWeight: 900, color: 'var(--black)', wordBreak: 'break-word' }}>
-                            {ci.cleanName}
-                          </span>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, background: 'var(--black)', color: '#ffffff', padding: '0.15rem 0.4rem', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                            {cleanDsg}
-                          </span>
-                        </div>
-                        <p style={{ fontSize: '0.72rem', color: 'var(--gray-500)', margin: '0.2rem 0 0 0' }}>
-                          Quantité : <strong>{ci.qty} fiole{ci.qty > 1 ? 's' : ''}</strong>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* PEPTIDE PRICE */}
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      {ci.hasPromo && (
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', textDecoration: 'line-through', display: 'block', fontWeight: 700 }}>
-                          {ci.unpromotedPeptideCost.toFixed(2).replace('.', ',')} €
-                        </span>
-                      )}
-                      <span style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--black)' }}>
-                        {ci.peptideCost.toFixed(2).replace('.', ',')} €
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* EAU BACTERIOSTATIQUE DETAILED ROW */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.6rem 0.8rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--black)', display: 'block' }}>
-                        Eau Bactériostatique 3ml
-                      </span>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--gray-500)', fontWeight: 600 }}>
-                        +{ci.unitBacPrice} € par fiole ({ci.bacQty} fiole{ci.bacQty > 1 ? 's' : ''})
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      {/* BAC QTY CONTROLLER */}
-                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden', background: '#f8fafc' }}>
-                        <button 
-                          onClick={() => onUpdateBacQty && onUpdateBacQty(idx, -1)}
-                          style={{ border: 'none', background: 'none', width: '24px', height: '24px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Diminuer l'eau BAC"
-                        >
-                          -
-                        </button>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, padding: '0 0.4rem', minWidth: '18px', textAlign: 'center' }}>
-                          {ci.bacQty}
-                        </span>
-                        <button 
-                          onClick={() => onUpdateBacQty && onUpdateBacQty(idx, 1)}
-                          style={{ border: 'none', background: 'none', width: '24px', height: '24px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Augmenter l'eau BAC"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--black)', minWidth: '45px', textAlign: 'right' }}>
-                        +{ci.bacCost.toFixed(2).replace('.', ',')} €
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* ITEM BOTTOM CONTROLS (PEPTIDE QTY & REMOVE) */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.6rem', marginTop: '0.1rem' }}>
-                    
-                    {/* FIOLES QUANTITY CONTROLLER (- 1 +) */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--gray-500)' }}>Fioles :</span>
-                      <div style={{ display: 'flex', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
-                        <button 
-                          onClick={() => onUpdateQty && onUpdateQty(idx, -1)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            width: '28px',
-                            height: '28px',
-                            fontSize: '0.9rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--black)'
-                          }}
-                          title="Diminuer les fioles"
-                        >
-                          -
-                        </button>
-                        <span style={{ padding: '0 0.8rem', fontSize: '0.82rem', fontWeight: 800, color: 'var(--black)' }}>
-                          {ci.qty}
-                        </span>
-                        <button 
-                          onClick={() => onUpdateQty && onUpdateQty(idx, 1)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            width: '28px',
-                            height: '28px',
-                            fontSize: '0.9rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--black)'
-                          }}
-                          title="Augmenter les fioles"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* DELETE ITEM BUTTON */}
-                    <button 
-                      onClick={() => onRemoveItem && onRemoveItem(idx)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.3rem',
-                        background: 'none',
-                        border: 'none',
-                        color: '#ef4444',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        padding: '0.3rem 0.6rem',
-                        borderRadius: '6px',
-                        transition: 'background 0.2s ease'
-                      }}
-                      title="Retirer l'article"
-                    >
-                      <TrashIcon />
-                      <span>Retirer</span>
-                    </button>
-                  </div>
-
-                </div>
-              )
-            })
-          )}
-        </div>
-
-        {/* PROMO CODE BOX */}
-        {cartItems.length > 0 && (
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.9rem', marginBottom: '1rem' }}>
-            <p style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--gray-700)', margin: '0 0 0.5rem 0', letterSpacing: '0.04em' }}>
-              🏷️ CODE PROMO
-            </p>
-            {appliedPromo ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '0.5rem 0.8rem' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d' }}>
-                  ✓ Code {appliedPromo.code} ({appliedPromo.type === 'percent' ? `-${appliedPromo.value}%` : `-${appliedPromo.value}€`})
-                </span>
-                <button 
-                  type="button"
-                  onClick={handleRemovePromo}
-                  style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer' }}
-                >
-                  Retirer
-                </button>
+        {/* MODAL BODY (SCROLLABLE) */}
+        <div 
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            padding: '1rem 1.2rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}
+        >
+          {/* CART ITEMS LIST */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {cartItems.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem 1rem', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1' }}>
+                <p style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--gray-600)', margin: '0 0 0.4rem 0' }}>
+                  Votre panier est vide 🛒
+                </p>
+                <p style={{ fontSize: '0.74rem', color: 'var(--gray-500)', margin: 0 }}>
+                  Sélectionnez des articles pour débuter votre commande.
+                </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input 
-                  type="text"
-                  value={promoInput}
-                  onChange={(e) => { setPromoInput(e.target.value); setPromoStatus({ msg: '', isError: false }); }}
-                  placeholder="Entrez votre code promo"
-                  style={{ flex: 1, padding: '0.45rem 0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase' }}
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyPromo}
-                  style={{ background: 'var(--black)', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0.45rem 1rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
-                >
-                  APPLIQUER
-                </button>
-              </div>
+              cartItems.map((item, idx) => {
+                const ci = computedItems[idx]
+                const cleanDsg = formatCleanDosage(item.dosage)
+                return (
+                  <div 
+                    key={idx} 
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.8rem',
+                      background: '#f8fafc',
+                      border: ci.hasPromo ? '1.5px solid #16a34a' : '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '0.9rem'
+                    }}
+                  >
+                    {/* TOP ROW: PRODUCT NAME + TOTAL COST */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--black)' }}>
+                            {ci.cleanName}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--gray-600)', background: '#e2e8f0', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                            {cleanDsg}
+                          </span>
+                          {ci.hasPromo && (
+                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #86efac' }}>
+                              ⚡ OFFRE PACK (-50%)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        {ci.originalUnitPrice > ci.basePrice && (
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600, lineHeight: 1 }}>
+                            {(ci.originalUnitPrice * ci.qty).toFixed(2).replace('.', ',')} €
+                          </div>
+                        )}
+                        <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--black)', lineHeight: 1.1 }}>
+                          {ci.peptideCost.toFixed(2).replace('.', ',')} €
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--gray-500)', marginTop: '2px' }}>
+                          {ci.qty} fiole{ci.qty > 1 ? 's' : ''} à {(ci.peptideCost / ci.qty).toFixed(2).replace('.', ',')}€
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* MAIN PEPTIDE QUANTITY CONTROL */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.45rem 0.75rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--black)' }}>
+                        Quantité (Fioles) :
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <button 
+                          type="button"
+                          onClick={() => onUpdateQty && onUpdateQty(idx, ci.qty - 1)}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            background: '#ffffff',
+                            color: 'var(--black)',
+                            fontSize: '0.95rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          -
+                        </button>
+
+                        <span style={{ fontSize: '0.88rem', fontWeight: 900, minWidth: '18px', textAlign: 'center', color: 'var(--black)' }}>
+                          {ci.qty}
+                        </span>
+
+                        <button 
+                          type="button"
+                          onClick={() => onUpdateQty && onUpdateQty(idx, ci.qty + 1)}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            background: 'var(--black)',
+                            color: '#ffffff',
+                            fontSize: '0.95rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* BACTERIOSTATIC WATER TOGGLE / COUNTER */}
+                    <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.6rem 0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontSize: '0.88rem' }}>💧</span>
+                          <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--black)', lineHeight: 1.1 }}>
+                              Eau Bactériostatique 10ml
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--gray-500)', marginTop: '1px' }}>
+                              Flacon de reconstitution (3,00 € / unité)
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button 
+                            type="button"
+                            onClick={() => onUpdateBacQty && onUpdateBacQty(idx, Math.max(0, ci.bacQty - 1))}
+                            disabled={ci.bacQty === 0}
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              background: ci.bacQty === 0 ? '#f1f5f9' : '#ffffff',
+                              color: ci.bacQty === 0 ? '#94a3b8' : 'var(--black)',
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              cursor: ci.bacQty === 0 ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            -
+                          </button>
+
+                          <span style={{ fontSize: '0.85rem', fontWeight: 900, minWidth: '16px', textAlign: 'center', color: ci.bacQty > 0 ? 'var(--black)' : 'var(--gray-400)' }}>
+                            {ci.bacQty}
+                          </span>
+
+                          <button 
+                            type="button"
+                            onClick={() => onUpdateBacQty && onUpdateBacQty(idx, ci.bacQty + 1)}
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              color: 'var(--black)',
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {ci.bacQty > 0 && (
+                        <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
+                          <span style={{ color: 'var(--gray-600)', fontWeight: 600 }}>
+                            Sous-total Eau Bactériostatique :
+                          </span>
+                          <span style={{ fontWeight: 800, color: 'var(--black)' }}>
+                            +{ci.bacCost.toFixed(2).replace('.', ',')} € ({ci.bacQty} x 3,00€)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BOTTOM ACTIONS: REMOVE ITEM */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.2rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveItem && onRemoveItem(idx)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          padding: 0
+                        }}
+                        title="Retirer l'article"
+                      >
+                        <TrashIcon />
+                        <span>Retirer</span>
+                      </button>
+                    </div>
+
+                  </div>
+                )
+              })
             )}
-            {promoStatus.msg && !appliedPromo && (
-              <p style={{ fontSize: '0.68rem', fontWeight: 700, color: promoStatus.isError ? '#ef4444' : '#15803d', marginTop: '0.4rem', marginBottom: 0 }}>
-                {promoStatus.msg}
+          </div>
+
+          {/* PROMO CODE BOX */}
+          {cartItems.length > 0 && (
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.8rem' }}>
+              <p style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--gray-700)', margin: '0 0 0.4rem 0', letterSpacing: '0.04em' }}>
+                🏷️ CODE PROMO
               </p>
-            )}
-          </div>
-        )}
-
-        {/* TOTAL SUMMARY CARD */}
-        {cartItems.length > 0 && (
-          <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '1.2rem', marginBottom: '1.5rem' }}>
-            {appliedPromo && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--gray-600)', fontWeight: 700, marginBottom: '0.3rem' }}>
-                <span>Sous-total</span>
-                <span>{subtotal.toFixed(2).replace('.', ',')} €</span>
-              </div>
-            )}
-            {appliedPromo && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#15803d', fontWeight: 800, marginBottom: '0.5rem' }}>
-                <span>Remise Code Promo ({appliedPromo.code})</span>
-                <span>-{promoDiscount.toFixed(2).replace('.', ',')} €</span>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', borderTop: appliedPromo ? '1px solid #cbd5e1' : 'none', paddingTop: appliedPromo ? '0.4rem' : '0' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--gray-600)', letterSpacing: '0.06em' }}>
-                TOTAL COMMANDE ({totalVials} fiole{totalVials > 1 ? 's' : ''})
-              </span>
-              <span style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--black)', letterSpacing: '-0.02em' }}>
-                {grandTotal.toFixed(2).replace('.', ',')} €
-              </span>
+              {appliedPromo ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '0.45rem 0.7rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d' }}>
+                    ✓ Code {appliedPromo.code} ({appliedPromo.type === 'percent' ? `-${appliedPromo.value}%` : `-${appliedPromo.value}€`})
+                  </span>
+                  <button 
+                    type="button"
+                    onClick={handleRemovePromo}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 800, fontSize: '0.72rem', cursor: 'pointer' }}
+                  >
+                    Retirer
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <input 
+                    type="text"
+                    value={promoInput}
+                    onChange={(e) => { setPromoInput(e.target.value); setPromoStatus({ msg: '', isError: false }); }}
+                    placeholder="Code promo"
+                    style={{ flex: 1, minWidth: 0, width: '100%', padding: '0.45rem 0.7rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyPromo}
+                    style={{ background: 'var(--black)', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0.45rem 0.8rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  >
+                    APPLIQUER
+                  </button>
+                </div>
+              )}
+              {promoStatus.msg && !appliedPromo && (
+                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: promoStatus.isError ? '#ef4444' : '#15803d', marginTop: '0.4rem', marginBottom: 0 }}>
+                  {promoStatus.msg}
+                </p>
+              )}
             </div>
-            <p style={{ fontSize: '0.68rem', color: 'var(--gray-500)', margin: 0 }}>
-              ✓ Expédition rapide & emballage isotherme sécurisé
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* SINGLE PRIMARY WHATSAPP CTA BUTTON */}
-        <a 
-          href={cartItems.length > 0 ? whatsappUrl : '#'}
-          target={cartItems.length > 0 ? "_blank" : "_self"}
-          rel="noopener noreferrer"
-          onClick={(e) => {
-            if (cartItems.length === 0) {
-              e.preventDefault()
-              return
-            }
-            // Record order in localStorage for Admin Dashboard analytics
-            try {
-              const existingSales = JSON.parse(localStorage.getItem('kratos_sales_history') || '[]')
-              const newOrder = {
-                id: 'KB-' + Math.floor(100000 + Math.random() * 900000),
-                date: new Date().toISOString(),
-                formattedDate: new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }),
-                items: computedItems.map((ci, idx) => ({
-                  name: ci.cleanName,
-                  dosage: formatCleanDosage(cartItems[idx]?.dosage || '10MG'),
-                  qty: ci.qty,
-                  peptideCost: ci.peptideCost,
-                  bacQty: ci.bacQty,
-                  bacCost: ci.bacCost,
-                  totalCost: ci.totalCost
-                })),
-                totalVials: totalVials,
-                grandTotal: grandTotal,
-                status: 'Confirmé (WhatsApp)'
-              }
-              localStorage.setItem('kratos_sales_history', JSON.stringify([newOrder, ...existingSales]))
-              window.dispatchEvent(new Event('kratos_sales_updated'))
-            } catch (err) {
-              console.error('Error saving order:', err)
-            }
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.7rem',
-            background: cartItems.length > 0 ? '#16a34a' : '#cbd5e1',
-            color: '#ffffff',
-            fontWeight: 800,
-            fontSize: '0.88rem',
-            letterSpacing: '0.04em',
-            padding: '1.1rem 1.5rem',
-            borderRadius: '12px',
-            textDecoration: 'none',
-            boxShadow: cartItems.length > 0 ? '0 8px 25px rgba(22, 163, 74, 0.3)' : 'none',
-            cursor: cartItems.length > 0 ? 'pointer' : 'not-allowed',
-            transition: 'all 0.2s ease',
-            width: '100%',
-            boxSizing: 'border-box'
+          {/* TOTAL SUMMARY CARD */}
+          {cartItems.length > 0 && (
+            <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '1rem' }}>
+              {appliedPromo && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--gray-600)', fontWeight: 700, marginBottom: '0.2rem' }}>
+                  <span>Sous-total</span>
+                  <span>{subtotal.toFixed(2).replace('.', ',')} €</span>
+                </div>
+              )}
+              {appliedPromo && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#15803d', fontWeight: 800, marginBottom: '0.4rem' }}>
+                  <span>Remise Code Promo ({appliedPromo.code})</span>
+                  <span>-{promoDiscount.toFixed(2).replace('.', ',')} €</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem', borderTop: appliedPromo ? '1px solid #cbd5e1' : 'none', paddingTop: appliedPromo ? '0.3rem' : '0' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--gray-600)', letterSpacing: '0.06em' }}>
+                  TOTAL COMMANDE ({totalVials} fiole{totalVials > 1 ? 's' : ''})
+                </span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--black)', letterSpacing: '-0.02em' }}>
+                  {grandTotal.toFixed(2).replace('.', ',')} €
+                </span>
+              </div>
+              <p style={{ fontSize: '0.65rem', color: 'var(--gray-500)', margin: 0 }}>
+                ✓ Expédition rapide & emballage isotherme sécurisé
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* MODAL FOOTER (PINNED AT BOTTOM) */}
+        <div 
+          style={{ 
+            padding: '0.8rem 1.2rem 1rem', 
+            borderTop: '1px solid #f1f5f9', 
+            background: '#ffffff', 
+            flexShrink: 0 
           }}
         >
-          <WhatsAppIcon />
-          <span>FINALISER ET COMMANDER SUR WHATSAPP ➔</span>
-        </a>
+          <a 
+            href={cartItems.length > 0 ? whatsappUrl : '#'}
+            target={cartItems.length > 0 ? "_blank" : "_self"}
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              if (cartItems.length === 0) {
+                e.preventDefault()
+                return
+              }
+              // Record order in localStorage for Admin Dashboard analytics
+              try {
+                const existingSales = JSON.parse(localStorage.getItem('kratos_sales_history') || '[]')
+                const newOrder = {
+                  id: 'KB-' + Math.floor(100000 + Math.random() * 900000),
+                  date: new Date().toISOString(),
+                  formattedDate: new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }),
+                  items: computedItems.map((ci, idx) => ({
+                    name: ci.cleanName,
+                    dosage: formatCleanDosage(cartItems[idx]?.dosage || '10MG'),
+                    qty: ci.qty,
+                    peptideCost: ci.peptideCost,
+                    bacQty: ci.bacQty,
+                    bacCost: ci.bacCost,
+                    totalCost: ci.totalCost
+                  })),
+                  totalVials: totalVials,
+                  grandTotal: grandTotal,
+                  status: 'Confirmé (WhatsApp)'
+                }
+                localStorage.setItem('kratos_sales_history', JSON.stringify([newOrder, ...existingSales]))
+                window.dispatchEvent(new Event('kratos_sales_updated'))
+              } catch (err) {
+                console.error('Error saving order:', err)
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.6rem',
+              background: cartItems.length > 0 ? '#16a34a' : '#cbd5e1',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '0.82rem',
+              letterSpacing: '0.03em',
+              padding: '0.95rem 1.2rem',
+              borderRadius: '12px',
+              textDecoration: 'none',
+              boxShadow: cartItems.length > 0 ? '0 6px 20px rgba(22, 163, 74, 0.28)' : 'none',
+              cursor: cartItems.length > 0 ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s ease',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          >
+            <WhatsAppIcon />
+            <span>FINALISER ET COMMANDER SUR WHATSAPP ➔</span>
+          </a>
+        </div>
 
       </div>
     </div>
