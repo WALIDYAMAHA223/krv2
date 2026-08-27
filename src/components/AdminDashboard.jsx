@@ -108,7 +108,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
   const [pin, setPin] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [pinError, setPinError] = useState(false)
-  const [activeTab, setActiveTab] = useState('analytics') // 'analytics' | 'announcement' | 'stocks' | 'promocodes' | 'reviews' | 'settings'
+  const [activeTab, setActiveTab] = useState('analytics') // 'analytics' | 'announcement' | 'stocks' | 'promocodes' | 'reviews' | 'settings' | 'flashsale' | 'memo'
 
   // Editable config state
   const [config, setConfig] = useState(siteConfig)
@@ -123,6 +123,28 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
   const [manualBac, setManualBac] = useState(true)
   const [manualCustomPrice, setManualCustomPrice] = useState('')  // prix libre saisi par l'admin
   const [manualPriceMode, setManualPriceMode] = useState('auto') // 'auto' | 'custom'
+
+  // Monthly goal
+  const [monthlyGoal, setMonthlyGoal] = useState(() => {
+    return parseInt(localStorage.getItem('kratos_monthly_goal') || '1000')
+  })
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalInput, setGoalInput] = useState('')
+
+  // Admin memo
+  const [adminMemo, setAdminMemo] = useState(() => {
+    return localStorage.getItem('kratos_admin_memo') || ''
+  })
+  const [memoSaved, setMemoSaved] = useState(false)
+
+  // Flash sale
+  const [flashSaleForm, setFlashSaleForm] = useState({
+    label: '',
+    endDate: '',
+    endTime: '',
+    discountType: 'percent',
+    discountValue: ''
+  })
 
   // Promo code management state
   const [newPromoCode, setNewPromoCode] = useState('')
@@ -478,8 +500,10 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                   { id: 'analytics', label: '📊 ANALYTICS & CA', badge: null },
                   { id: 'announcement', label: '📢 BARRE D\'ANNONCE', badge: config?.announcement?.enabled ? 'ACTIF' : 'INACTIF' },
                   { id: 'stocks', label: '📦 STOCKS & PRIX', badge: null },
+                  { id: 'flashsale', label: '⚡ FLASH SALE', badge: config?.flashSale?.active ? 'LIVE' : null },
                   { id: 'promocodes', label: '🏷️ CODES PROMO', badge: config?.promoCodes?.filter(p=>p.active!==false)?.length ? `${config.promoCodes.filter(p=>p.active!==false).length}` : null },
                   { id: 'reviews', label: '⭐ AVIS CLIENTS', badge: pendingCount > 0 ? `${pendingCount}` : null },
+                  { id: 'memo', label: '📝 MÉMO ADMIN', badge: null },
                   { id: 'settings', label: '⚙️ CONFIGURATION', badge: null }
                 ].map(tab => (
                   <button
@@ -591,6 +615,63 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                   </div>
 
                 </div>
+
+                {/* MONTHLY GOAL PROGRESS BAR */}
+                {(() => {
+                  const now = new Date()
+                  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+                  const monthRevenue = salesHistory
+                    .filter(s => new Date(s.date) >= monthStart)
+                    .reduce((sum, s) => sum + (s.grandTotal || 0), 0)
+                  const pct = monthlyGoal > 0 ? Math.min(100, (monthRevenue / monthlyGoal) * 100) : 0
+                  const monthName = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
+                  return (
+                    <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '1.2rem', marginBottom: '1.8rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div>
+                          <p style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray-600)', margin: '0 0 0.1rem 0' }}>OBJECTIF MENSUEL — {monthName.toUpperCase()}</p>
+                          <p style={{ fontSize: '0.8rem', fontWeight: 700, margin: 0, color: 'var(--black)' }}>
+                            <span style={{ fontWeight: 900, fontSize: '1rem' }}>{monthRevenue.toFixed(0)} €</span>
+                            <span style={{ color: 'var(--gray-500)' }}> / {monthlyGoal} €</span>
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: 900, fontSize: '1.1rem', color: pct >= 100 ? '#15803d' : pct >= 50 ? '#f59e0b' : '#ef4444' }}>{pct.toFixed(0)}%</span>
+                          {!editingGoal ? (
+                            <button type="button" onClick={() => { setGoalInput(monthlyGoal); setEditingGoal(true) }}
+                              style={{ fontSize: '0.68rem', fontWeight: 800, padding: '0.25rem 0.6rem', borderRadius: '5px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>
+                              ✏️ Modifier
+                            </button>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                              <input type="number" value={goalInput} onChange={e => setGoalInput(e.target.value)}
+                                style={{ width: '90px', padding: '0.3rem 0.5rem', borderRadius: '5px', border: '1.5px solid var(--black)', fontWeight: 800, fontSize: '0.85rem' }} />
+                              <span style={{ fontWeight: 800 }}>€</span>
+                              <button type="button" onClick={() => { const v = parseInt(goalInput) || 1000; setMonthlyGoal(v); localStorage.setItem('kratos_monthly_goal', v); setEditingGoal(false) }}
+                                style={{ fontSize: '0.68rem', fontWeight: 900, padding: '0.3rem 0.6rem', borderRadius: '5px', border: 'none', background: 'var(--black)', color: '#fff', cursor: 'pointer' }}>
+                                ✓ OK
+                              </button>
+                              <button type="button" onClick={() => setEditingGoal(false)}
+                                style={{ fontSize: '0.68rem', fontWeight: 800, padding: '0.3rem 0.5rem', borderRadius: '5px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ background: '#e2e8f0', borderRadius: '99px', height: '10px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${pct}%`, height: '100%', borderRadius: '99px',
+                          background: pct >= 100 ? '#15803d' : pct >= 50 ? '#f59e0b' : '#ef4444',
+                          transition: 'width 0.5s ease'
+                        }} />
+                      </div>
+                      {pct >= 100 && (
+                        <p style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800, margin: '0.5rem 0 0 0', textAlign: 'center' }}>🎉 Objectif du mois atteint !</p>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {/* SALES HISTORY CONTROLS */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.8rem' }}>
@@ -719,6 +800,195 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                     </table>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB: FLASH SALE */}
+            {activeTab === 'flashsale' && (
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '0.3rem' }}>⚡ GESTIONNAIRE FLASH SALE</h3>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '1.4rem' }}>
+                  Activez une vente flash limitée dans le temps. Un badge s'affichera sur votre site avec une réduction active.
+                </p>
+
+                {/* CURRENT STATUS */}
+                <div style={{ padding: '1rem 1.2rem', borderRadius: '10px', marginBottom: '1.5rem', border: config?.flashSale?.active ? '2px solid #f59e0b' : '1.5px solid #e2e8f0', background: config?.flashSale?.active ? '#fffbeb' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <p style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--gray-600)', margin: '0 0 0.2rem 0' }}>STATUT ACTUEL</p>
+                    {config?.flashSale?.active ? (
+                      <p style={{ margin: 0, fontWeight: 900, color: '#d97706', fontSize: '0.9rem' }}>
+                        🔥 FLASH SALE EN COURS — {config.flashSale.label || 'Offre exclusive'}
+                        {config.flashSale.discountType === 'percent' ? ` (-${config.flashSale.discountValue}%)` : ` (-${config.flashSale.discountValue}€)`}
+                        {config.flashSale.endsAt && <span style={{ fontSize: '0.72rem', color: '#92400e', display: 'block', marginTop: '0.2rem' }}>Expire le : {new Date(config.flashSale.endsAt).toLocaleString('fr-FR')}</span>}
+                      </p>
+                    ) : (
+                      <p style={{ margin: 0, fontWeight: 700, color: 'var(--gray-500)', fontSize: '0.85rem' }}>Aucune Flash Sale active.</p>
+                    )}
+                  </div>
+                  {config?.flashSale?.active && (
+                    <button
+                      type="button"
+                      onClick={() => updateAndSaveConfig({ ...config, flashSale: { ...config.flashSale, active: false } })}
+                      style={{ padding: '0.5rem 1rem', fontWeight: 900, fontSize: '0.75rem', borderRadius: '7px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer' }}
+                    >
+                      🛑 DÉSACTIVER LA FLASH SALE
+                    </button>
+                  )}
+                </div>
+
+                {/* CREATE FLASH SALE FORM */}
+                <div style={{ padding: '1.4rem', border: '1.5px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 900, margin: '0 0 1rem 0' }}>CONFIGURER UNE NOUVELLE FLASH SALE</h4>
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Libellé de l'offre</label>
+                      <input
+                        type="text"
+                        value={flashSaleForm.label}
+                        onChange={e => setFlashSaleForm(f => ({ ...f, label: e.target.value }))}
+                        placeholder="ex: OFFRE RENTRÉE — Fioles RETA"
+                        style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.88rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Type de réduction</label>
+                        <select
+                          value={flashSaleForm.discountType}
+                          onChange={e => setFlashSaleForm(f => ({ ...f, discountType: e.target.value }))}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                        >
+                          <option value="percent">Pourcentage (%)</option>
+                          <option value="fixed">Montant fixe (€)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Valeur</label>
+                        <input
+                          type="number" min={1}
+                          value={flashSaleForm.discountValue}
+                          onChange={e => setFlashSaleForm(f => ({ ...f, discountValue: e.target.value }))}
+                          placeholder={flashSaleForm.discountType === 'percent' ? 'ex: 20' : 'ex: 15'}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 800 }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Date de fin</label>
+                        <input
+                          type="date"
+                          value={flashSaleForm.endDate}
+                          onChange={e => setFlashSaleForm(f => ({ ...f, endDate: e.target.value }))}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Heure de fin</label>
+                        <input
+                          type="time"
+                          value={flashSaleForm.endTime}
+                          onChange={e => setFlashSaleForm(f => ({ ...f, endTime: e.target.value }))}
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!flashSaleForm.label || !flashSaleForm.discountValue || !flashSaleForm.endDate || !flashSaleForm.endTime}
+                      onClick={() => {
+                        const endDateTime = new Date(`${flashSaleForm.endDate}T${flashSaleForm.endTime}`)
+                        updateAndSaveConfig({
+                          ...config,
+                          flashSale: {
+                            active: true,
+                            label: flashSaleForm.label,
+                            discountType: flashSaleForm.discountType,
+                            discountValue: parseFloat(flashSaleForm.discountValue),
+                            endsAt: endDateTime.toISOString()
+                          }
+                        })
+                        setSaveMessage('⚡ Flash Sale activée et diffusée en direct !')
+                        setTimeout(() => setSaveMessage(''), 4000)
+                      }}
+                      style={{
+                        width: '100%', padding: '0.9rem', fontWeight: 900, fontSize: '0.85rem',
+                        borderRadius: '8px', border: 'none', cursor: 'pointer',
+                        background: (!flashSaleForm.label || !flashSaleForm.discountValue || !flashSaleForm.endDate || !flashSaleForm.endTime) ? '#cbd5e1' : '#f59e0b',
+                        color: '#ffffff',
+                        opacity: (!flashSaleForm.label || !flashSaleForm.discountValue || !flashSaleForm.endDate || !flashSaleForm.endTime) ? 0.6 : 1
+                      }}
+                    >
+                      ⚡ ACTIVER LA FLASH SALE EN DIRECT
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: MÉMO ADMIN */}
+            {activeTab === 'memo' && (
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '0.3rem' }}>📝 MÉMO ADMIN</h3>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '1.2rem' }}>
+                  Votre bloc-notes privé. Notez des infos importantes : numéros de clients, commandes en attente, rappels, stocks à commander...
+                </p>
+
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    value={adminMemo}
+                    onChange={e => { setAdminMemo(e.target.value); setMemoSaved(false) }}
+                    placeholder={`Exemples de notes :\n• Client Ahmed — commande 6x RETA — livraison lundi\n• Réapprovisionner GHK-Cu avant fin du mois\n• Appeler fournisseur : +33 6 XX XX XX XX\n• Penser à activer le code promo RENTRÉE25`}
+                    rows={16}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      borderRadius: '10px',
+                      border: '1.5px solid #e2e8f0',
+                      fontSize: '0.88rem',
+                      fontFamily: 'inherit',
+                      fontWeight: 600,
+                      lineHeight: 1.7,
+                      resize: 'vertical',
+                      outline: 'none',
+                      background: '#fffdf5',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.8rem', marginTop: '1rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.setItem('kratos_admin_memo', adminMemo)
+                      setMemoSaved(true)
+                      setTimeout(() => setMemoSaved(false), 3000)
+                    }}
+                    className="btn-primary"
+                    style={{ padding: '0.75rem 1.5rem', fontWeight: 900, fontSize: '0.85rem' }}
+                  >
+                    💾 SAUVEGARDER LE MÉMO
+                  </button>
+                  {memoSaved && (
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#15803d' }}>✓ Mémo sauvegardé localement</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { if (window.confirm('Effacer tout le mémo ?')) { setAdminMemo(''); localStorage.setItem('kratos_admin_memo', '') } }}
+                    style={{ marginLeft: 'auto', padding: '0.6rem 1rem', fontSize: '0.72rem', fontWeight: 800, borderRadius: '6px', border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', cursor: 'pointer' }}
+                  >
+                    🗑️ Effacer
+                  </button>
+                </div>
+
+                <div style={{ marginTop: '1.2rem', padding: '0.8rem 1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.72rem', color: '#15803d', fontWeight: 700 }}>
+                  💡 Le mémo est sauvegardé localement sur cet appareil. Il ne sera pas synchronisé entre plusieurs appareils.
+                </div>
               </div>
             )}
 
