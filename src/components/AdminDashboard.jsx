@@ -121,6 +121,8 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
   const [manualProd, setManualProd] = useState('RETA')
   const [manualQty, setManualQty] = useState(3)
   const [manualBac, setManualBac] = useState(true)
+  const [manualCustomPrice, setManualCustomPrice] = useState('')  // prix libre saisi par l'admin
+  const [manualPriceMode, setManualPriceMode] = useState('auto') // 'auto' | 'custom'
 
   // Promo code management state
   const [newPromoCode, setNewPromoCode] = useState('')
@@ -205,9 +207,14 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     }
   }
 
+  const updateAndSaveConfig = (newConf) => {
+    setConfig(newConf)
+    if (onUpdateConfig) onUpdateConfig(newConf)
+    pushCloudState({ siteConfig: newConf })
+  }
+
   const handleSaveConfig = () => {
-    if (onUpdateConfig) onUpdateConfig(config)
-    pushCloudState({ siteConfig: config })
+    updateAndSaveConfig(config)
     setSaveMessage('✓ Modifications enregistrées avec succès !')
     setTimeout(() => setSaveMessage(''), 4000)
   }
@@ -239,16 +246,26 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     }
   }
 
-  const handleAddManualSale = (e) => {
-    e.preventDefault()
-    const basePrice = manualProd === 'RETA' ? (config.products.RETA.price || 60) : (config.products['GHK-Cu'].price || 50)
-    const packs = Math.floor(manualQty / 3)
-    const remainder = manualQty % 3
-    const pack3Price = (basePrice === 60 && config.pack3Price) ? config.pack3Price : (basePrice * 2.5)
-    const peptideCost = (packs * pack3Price) + (remainder * basePrice)
+  const calcManualSale = () => {
+    const basePrice = manualProd === 'RETA' ? (config.products?.RETA?.price || 60) : (config.products?.['GHK-Cu']?.price || 50)
     const bacPrice = config.bacWaterPrice || 3
     const bacCost = manualBac ? (manualQty * bacPrice) : 0
+    let peptideCost
+    if (manualPriceMode === 'custom' && manualCustomPrice !== '') {
+      peptideCost = parseFloat(manualCustomPrice) || 0
+    } else {
+      const packs = Math.floor(manualQty / 3)
+      const remainder = manualQty % 3
+      const pack3Price = (basePrice === 60 && config.pack3Price) ? config.pack3Price : (basePrice * 2.5)
+      peptideCost = (packs * pack3Price) + (remainder * basePrice)
+    }
     const grandTotal = peptideCost + bacCost
+    return { peptideCost, bacCost, grandTotal }
+  }
+
+  const handleAddManualSale = (e) => {
+    e.preventDefault()
+    const { peptideCost, bacCost, grandTotal } = calcManualSale()
 
     const newOrder = {
       id: 'KB-M' + Math.floor(100000 + Math.random() * 900000),
@@ -267,13 +284,16 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
       ],
       totalVials: manualQty,
       grandTotal,
-      status: 'Manuelle / Comptoir'
+      status: manualPriceMode === 'custom' ? 'Manuelle / Prix libre' : 'Manuelle / Comptoir'
     }
 
     const updated = [newOrder, ...salesHistory]
     setSalesHistory(updated)
     pushCloudState({ salesHistory: updated })
     setShowManualSaleModal(false)
+    // Reset
+    setManualPriceMode('auto')
+    setManualCustomPrice('')
   }
 
   const exportSalesCSV = () => {
@@ -718,7 +738,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                       <input 
                         type="checkbox"
                         checked={config.announcement?.enabled ?? true}
-                        onChange={(e) => setConfig({
+                        onChange={(e) => updateAndSaveConfig({
                           ...config,
                           announcement: {
                             ...(config.announcement || {}),
@@ -780,7 +800,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                       <input 
                         type="text" 
                         value={config.announcement?.text || ''}
-                        onChange={(e) => setConfig({
+                        onChange={(e) => updateAndSaveConfig({
                           ...config,
                           announcement: {
                             ...(config.announcement || {}),
@@ -802,7 +822,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                           <button
                             key={c.value}
                             type="button"
-                            onClick={() => setConfig({
+                            onClick={() => updateAndSaveConfig({
                               ...config,
                               announcement: {
                                 ...(config.announcement || {}),
@@ -834,7 +854,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                         <input 
                           type="text" 
                           value={config.announcement?.linkText || ''}
-                          onChange={(e) => setConfig({
+                          onChange={(e) => updateAndSaveConfig({
                             ...config,
                             announcement: {
                               ...(config.announcement || {}),
@@ -853,7 +873,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                         <input 
                           type="text" 
                           value={config.announcement?.linkUrl || '#selection'}
-                          onChange={(e) => setConfig({
+                          onChange={(e) => updateAndSaveConfig({
                             ...config,
                             announcement: {
                               ...(config.announcement || {}),
@@ -909,7 +929,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                           type="number" 
                           min={0}
                           value={config.products.RETA.stock}
-                          onChange={(e) => setConfig({
+                          onChange={(e) => updateAndSaveConfig({
                             ...config,
                             products: {
                               ...config.products,
@@ -924,7 +944,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                             <button
                               key={delta}
                               type="button"
-                              onClick={() => setConfig({
+                              onClick={() => updateAndSaveConfig({
                                 ...config,
                                 products: {
                                   ...config.products,
@@ -938,7 +958,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                           ))}
                           <button
                             type="button"
-                            onClick={() => setConfig({
+                            onClick={() => updateAndSaveConfig({
                               ...config,
                               products: {
                                 ...config.products,
@@ -961,7 +981,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                             <input 
                               type="number" 
                               value={config.products.RETA.price}
-                              onChange={(e) => setConfig({
+                              onChange={(e) => updateAndSaveConfig({
                                 ...config,
                                 products: {
                                   ...config.products,
@@ -979,7 +999,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                               {Boolean(config.products.RETA.originalPrice && config.products.RETA.originalPrice > config.products.RETA.price) && (
                                 <button
                                   type="button"
-                                  onClick={() => setConfig({
+                                  onClick={() => updateAndSaveConfig({
                                     ...config,
                                     products: {
                                       ...config.products,
@@ -996,7 +1016,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                               type="number" 
                               value={config.products.RETA.originalPrice || ''}
                               placeholder="0 (Désactivé)"
-                              onChange={(e) => setConfig({
+                              onChange={(e) => updateAndSaveConfig({
                                 ...config,
                                 products: {
                                   ...config.products,
@@ -1046,7 +1066,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                           type="number" 
                           min={0}
                           value={config.products['GHK-Cu'].stock}
-                          onChange={(e) => setConfig({
+                          onChange={(e) => updateAndSaveConfig({
                             ...config,
                             products: {
                               ...config.products,
@@ -1061,7 +1081,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                             <button
                               key={delta}
                               type="button"
-                              onClick={() => setConfig({
+                              onClick={() => updateAndSaveConfig({
                                 ...config,
                                 products: {
                                   ...config.products,
@@ -1075,7 +1095,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                           ))}
                           <button
                             type="button"
-                            onClick={() => setConfig({
+                            onClick={() => updateAndSaveConfig({
                               ...config,
                               products: {
                                 ...config.products,
@@ -1098,7 +1118,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                             <input 
                               type="number" 
                               value={config.products['GHK-Cu'].price}
-                              onChange={(e) => setConfig({
+                              onChange={(e) => updateAndSaveConfig({
                                 ...config,
                                 products: {
                                   ...config.products,
@@ -1116,7 +1136,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                               {Boolean(config.products['GHK-Cu'].originalPrice && config.products['GHK-Cu'].originalPrice > config.products['GHK-Cu'].price) && (
                                 <button
                                   type="button"
-                                  onClick={() => setConfig({
+                                  onClick={() => updateAndSaveConfig({
                                     ...config,
                                     products: {
                                       ...config.products,
@@ -1133,7 +1153,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                               type="number" 
                               value={config.products['GHK-Cu'].originalPrice || ''}
                               placeholder="0 (Désactivé)"
-                              onChange={(e) => setConfig({
+                              onChange={(e) => updateAndSaveConfig({
                                 ...config,
                                 products: {
                                   ...config.products,
@@ -1169,7 +1189,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                         <input 
                           type="number" 
                           value={config.pack3Price}
-                          onChange={(e) => setConfig({ ...config, pack3Price: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateAndSaveConfig({ ...config, pack3Price: parseFloat(e.target.value) || 0 })}
                           style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
                         />
                       </div>
@@ -1181,7 +1201,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                         <input 
                           type="number" 
                           value={config.bacWaterPrice}
-                          onChange={(e) => setConfig({ ...config, bacWaterPrice: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateAndSaveConfig({ ...config, bacWaterPrice: parseFloat(e.target.value) || 0 })}
                           style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
                         />
                       </div>
@@ -1429,7 +1449,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                       type="text" 
                       value={config.whatsappNumber || ''}
                       placeholder="ex: 32465983104"
-                      onChange={(e) => setConfig({ ...config, whatsappNumber: e.target.value })}
+                      onChange={(e) => updateAndSaveConfig({ ...config, whatsappNumber: e.target.value })}
                       style={{ width: '100%', padding: '0.7rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
                     />
                     <span style={{ fontSize: '0.68rem', color: 'var(--gray-600)', display: 'block', marginTop: '0.3rem' }}>
@@ -1453,72 +1473,175 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
       </div>
 
       {/* MANUAL SALE MODAL */}
-      {showManualSaleModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 3000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem'
-        }}>
+      {showManualSaleModal && (() => {
+        const { peptideCost, bacCost, grandTotal } = calcManualSale()
+        return (
           <div style={{
-            background: '#ffffff',
-            width: '100%',
-            maxWidth: '420px',
-            borderRadius: '14px',
-            padding: '1.8rem',
-            position: 'relative'
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 3000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
           }}>
-            <button onClick={() => setShowManualSaleModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 800 }}>✕</button>
-            <h4 style={{ fontSize: '1.1rem', fontWeight: 900, margin: '0 0 1rem 0' }}>SAISIR UNE VENTE MANUELLE</h4>
-            
-            <form onSubmit={handleAddManualSale}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem' }}>PRODUIT</label>
-                <select 
-                  value={manualProd}
-                  onChange={(e) => setManualProd(e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
-                >
-                  <option value="RETA">RETA (10MG)</option>
-                  <option value="GHK-Cu">GHK-Cu (100MG)</option>
-                </select>
-              </div>
+            <div style={{
+              background: '#ffffff',
+              width: '100%',
+              maxWidth: '460px',
+              borderRadius: '14px',
+              padding: '1.8rem',
+              position: 'relative',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.25)'
+            }}>
+              <button onClick={() => { setShowManualSaleModal(false); setManualPriceMode('auto'); setManualCustomPrice('') }} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 800 }}>✕</button>
+              <h4 style={{ fontSize: '1.1rem', fontWeight: 900, margin: '0 0 0.3rem 0' }}>SAISIR UNE VENTE MANUELLE</h4>
+              <p style={{ fontSize: '0.72rem', color: 'var(--gray-600)', margin: '0 0 1.2rem 0' }}>Enregistrez une vente effectuée hors site.</p>
+              
+              <form onSubmit={handleAddManualSale}>
+                {/* PRODUIT */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Produit</label>
+                  <select 
+                    value={manualProd}
+                    onChange={(e) => setManualProd(e.target.value)}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.85rem' }}
+                  >
+                    <option value="RETA">RETA (10MG)</option>
+                    <option value="GHK-Cu">GHK-Cu (100MG)</option>
+                  </select>
+                </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem' }}>QUANTITÉ DE FIOLES</label>
-                <input 
-                  type="number"
-                  min={1}
-                  value={manualQty}
-                  onChange={(e) => setManualQty(parseInt(e.target.value) || 1)}
-                  style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 800 }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '1.4rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                {/* QUANTITÉ */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Quantité de fioles</label>
                   <input 
-                    type="checkbox"
-                    checked={manualBac}
-                    onChange={(e) => setManualBac(e.target.checked)}
-                    style={{ width: '16px', height: '16px', accentColor: 'var(--black)' }}
+                    type="number"
+                    min={1}
+                    value={manualQty}
+                    onChange={(e) => setManualQty(parseInt(e.target.value) || 1)}
+                    style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 800, fontSize: '0.9rem' }}
                   />
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Inclure Eau Bactériostatique (+3€/fiole)</span>
-                </label>
-              </div>
+                </div>
 
-              <button type="submit" className="btn-primary" style={{ width: '100%', padding: '0.8rem', fontWeight: 900 }}>
-                + ENREGISTRER LA VENTE
-              </button>
-            </form>
+                {/* PRIX — MODE AUTO / PERSONNALISÉ */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.4rem', textTransform: 'uppercase' }}>Prix peptides</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setManualPriceMode('auto')}
+                      style={{
+                        flex: 1,
+                        padding: '0.5rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        borderRadius: '6px',
+                        border: manualPriceMode === 'auto' ? '2px solid var(--black)' : '1px solid #cbd5e1',
+                        background: manualPriceMode === 'auto' ? 'var(--black)' : '#f8fafc',
+                        color: manualPriceMode === 'auto' ? '#fff' : 'var(--black)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔄 Auto (tarif site)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualPriceMode('custom')}
+                      style={{
+                        flex: 1,
+                        padding: '0.5rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        borderRadius: '6px',
+                        border: manualPriceMode === 'custom' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                        background: manualPriceMode === 'custom' ? '#7c3aed' : '#f8fafc',
+                        color: manualPriceMode === 'custom' ? '#fff' : 'var(--black)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ✏️ Prix libre
+                    </button>
+                  </div>
+
+                  {manualPriceMode === 'auto' && (
+                    <div style={{ padding: '0.55rem 0.8rem', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--gray-600)', fontWeight: 600 }}>
+                      Prix calculé automatiquement selon le tarif configuré dans « Stocks & Prix ».
+                    </div>
+                  )}
+
+                  {manualPriceMode === 'custom' && (
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="Ex: 125.00"
+                        value={manualCustomPrice}
+                        onChange={(e) => setManualCustomPrice(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 2.2rem 0.65rem 0.8rem',
+                          borderRadius: '6px',
+                          border: '2px solid #7c3aed',
+                          fontWeight: 800,
+                          fontSize: '1rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <span style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#7c3aed', fontSize: '1rem' }}>€</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* EAU BAC */}
+                <div style={{ marginBottom: '1.2rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox"
+                      checked={manualBac}
+                      onChange={(e) => setManualBac(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--black)' }}
+                    />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Inclure Eau Bactériostatique (+{config.bacWaterPrice || 3}€/fiole)</span>
+                  </label>
+                </div>
+
+                {/* RÉCAPITULATIF DYNAMIQUE */}
+                <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '0.9rem 1rem', marginBottom: '1.2rem' }}>
+                  <p style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--gray-600)', margin: '0 0 0.6rem 0' }}>Récapitulatif</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                    <span style={{ color: 'var(--gray-600)' }}>Peptides ({manualQty} fiole{manualQty > 1 ? 's' : ''})</span>
+                    <span style={{ fontWeight: 800 }}>{peptideCost.toFixed(2).replace('.', ',')} €</span>
+                  </div>
+                  {manualBac && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                      <span style={{ color: 'var(--gray-600)' }}>Eau BAC ({manualQty} fiole{manualQty > 1 ? 's' : ''})</span>
+                      <span style={{ fontWeight: 800 }}>{bacCost.toFixed(2).replace('.', ',')} €</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
+                    <span style={{ fontWeight: 900 }}>TOTAL</span>
+                    <span style={{ fontWeight: 900, color: grandTotal > 0 ? '#15803d' : 'var(--gray-400)' }}>{grandTotal.toFixed(2).replace('.', ',')} €</span>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={manualPriceMode === 'custom' && manualCustomPrice === ''}
+                  className="btn-primary"
+                  style={{ width: '100%', padding: '0.85rem', fontWeight: 900, opacity: (manualPriceMode === 'custom' && manualCustomPrice === '') ? 0.5 : 1 }}
+                >
+                  + ENREGISTRER — {grandTotal.toFixed(2).replace('.', ',')} €
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
