@@ -43,22 +43,36 @@ export const calculateItemPricing = (item, siteConfig) => {
     : basePrice
   
   const qty = item.qty || 1
-  const packs = Math.floor(qty / 3)
-  const remainder = qty % 3
-  
-  // Pack 3 pricing: 50% discount on every 3rd vial (or siteConfig.pack3Price for 60€ products)
-  const pack3PriceConfig = (basePrice === 60 && siteConfig?.pack3Price) 
-    ? siteConfig.pack3Price 
-    : (basePrice * 2.5)
-  
-  // Peptide cost (3rd vial is discounted by 50%)
-  const peptideCost = (packs * pack3PriceConfig) + (remainder * basePrice)
-  const unpromotedPeptideCost = qty * originalUnitPrice
-  const hasPackPromo = packs > 0
-  const hasPricePromo = originalUnitPrice > basePrice
-  const hasPromo = hasPackPromo || hasPricePromo
 
-  // Bacteriostatic Water cost (explicit per bottle cost)
+  // ── FLASH SALE: override all peptide pricing with the flash unit price ──
+  const flashUnitPrice = item.flashSaleUnitPrice  // passed from ProductSelection
+  const flashSaleActive = item.flashSaleActive && flashUnitPrice != null
+
+  let peptideCost, unpromotedPeptideCost, hasPromo, hasPackPromo, hasPricePromo
+
+  if (flashSaleActive) {
+    peptideCost = flashUnitPrice * qty
+    unpromotedPeptideCost = basePrice * qty
+    hasPackPromo = false
+    hasPricePromo = false
+    hasPromo = true  // treat flash sale as a promo for badge display
+  } else {
+    const packs = Math.floor(qty / 3)
+    const remainder = qty % 3
+    
+    // Pack 3 pricing: 50% discount on every 3rd vial
+    const pack3PriceConfig = (basePrice === 60 && siteConfig?.pack3Price) 
+      ? siteConfig.pack3Price 
+      : (basePrice * 2.5)
+    
+    peptideCost = (packs * pack3PriceConfig) + (remainder * basePrice)
+    unpromotedPeptideCost = qty * originalUnitPrice
+    hasPackPromo = packs > 0
+    hasPricePromo = originalUnitPrice > basePrice
+    hasPromo = hasPackPromo || hasPricePromo
+  }
+
+  // Bacteriostatic Water cost
   const unitBacPrice = item.bacWaterUnitPrice || siteConfig?.bacWaterPrice || 3
   const bacQty = item.includeBacWater !== false 
     ? (item.bacWaterQty !== undefined ? item.bacWaterQty : qty) 
@@ -72,10 +86,11 @@ export const calculateItemPricing = (item, siteConfig) => {
     basePrice,
     originalUnitPrice,
     qty,
-    packs,
     hasPromo,
     hasPackPromo,
     hasPricePromo,
+    flashSaleActive,
+    flashUnitPrice,
     peptideCost,
     unpromotedPeptideCost,
     unitBacPrice,
@@ -329,12 +344,14 @@ export default function OrderModal({
                     }}
                   >
                     {/* PROMO BADGE */}
-                    {ci.hasPromo && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#dcfce7', color: '#15803d', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
+                    {(ci.hasPromo || ci.flashSaleActive) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: ci.flashSaleActive ? '#fffbeb' : '#dcfce7', color: ci.flashSaleActive ? '#d97706' : '#15803d', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
                         <span>
-                          {ci.hasPackPromo 
-                            ? 'PROMO APPLIQUÉE : Pack 3 Fioles (-50% sur la 3ème fiole)' 
-                            : `PROMO APPLIQUÉE : Offre Spéciale (-${(ci.unpromotedPeptideCost - ci.peptideCost).toFixed(2).replace('.', ',')} €)`
+                          {ci.flashSaleActive
+                            ? `⚡ FLASH SALE APPLIQUÉE — ${ci.flashUnitPrice.toFixed(2)}€/fiole au lieu de ${ci.basePrice.toFixed(2)}€`
+                            : ci.hasPackPromo 
+                              ? 'PROMO APPLIQUÉE : Pack 3 Fioles (-50% sur la 3ème fiole)' 
+                              : `PROMO APPLIQUÉE : Offre Spéciale (-${(ci.unpromotedPeptideCost - ci.peptideCost).toFixed(2).replace('.', ',')} €)`
                           }
                         </span>
                       </div>

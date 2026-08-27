@@ -143,7 +143,9 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     endDate: '',
     endTime: '',
     discountType: 'percent',
-    discountValue: ''
+    discountValue: '',
+    minQty: '1',
+    products: []
   })
 
   // Promo code management state
@@ -952,6 +954,26 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                       </div>
                     )}
 
+                    {/* QUANTITÉ MINIMUM */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Quantité minimum pour bénéficier du prix</label>
+                        <div style={{ position: 'relative' }}>
+                          <input type="number" min={1}
+                            value={flashSaleForm.minQty}
+                            onChange={e => setFlashSaleForm(f => ({ ...f, minQty: e.target.value }))}
+                            style={{ width: '100%', padding: '0.65rem 3rem 0.65rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 800, boxSizing: 'border-box' }} />
+                          <span style={{ position: 'absolute', right: '0.6rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#64748b', fontSize: '0.75rem' }}>fiole{parseInt(flashSaleForm.minQty) > 1 ? 's' : ''}</span>
+                        </div>
+                        <p style={{ fontSize: '0.68rem', color: '#64748b', margin: '0.3rem 0 0 0' }}>ex: 2 = le prix flash s'active à partir de 2 fioles</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '1.8rem' }}>
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.6rem', fontSize: '0.72rem', color: '#15803d', fontWeight: 700 }}>
+                          💡 En dessous de {flashSaleForm.minQty || 1} fiole{parseInt(flashSaleForm.minQty) > 1 ? 's' : ''}, le prix normal s'affiche avec un badge d'invitation.
+                        </div>
+                      </div>
+                    </div>
+
                     {/* DATE + HEURE FIN */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
                       <div>
@@ -979,6 +1001,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                             products: flashSaleForm.products,
                             discountType: flashSaleForm.discountType,
                             discountValue: parseFloat(flashSaleForm.discountValue),
+                            minQty: parseInt(flashSaleForm.minQty) || 1,
                             endsAt: endDateTime.toISOString()
                           }
                         })

@@ -122,11 +122,19 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
   const flashSale = siteConfig?.flashSale
   const flashActive = flashSale?.active && flashSale?.endsAt && new Date(flashSale.endsAt) > new Date()
   const flashApplies = flashActive && (flashSale.products || []).includes(activeTab)
-  const flashBasePrice = flashApplies ? (
+  const flashMinQty = flashSale?.minQty || 1
+  const flashQtyOk = flashApplies && qty >= flashMinQty
+
+  // Per-unit flash price
+  const flashUnitPrice = flashQtyOk ? (
     flashSale.discountType === 'percent'
       ? Math.max(0, singleBasePrice * (1 - flashSale.discountValue / 100))
-      : Math.max(0, singleBasePrice - flashSale.discountValue)
+      : flashSale.discountType === 'fixed'
+        ? Math.max(0, singleBasePrice - flashSale.discountValue)
+        : Math.max(0, flashSale.discountValue) // 'total' mode: total price for minQty, scale per unit
   ) : null
+  // Total flash price for current qty
+  const flashTotalPrice = flashQtyOk ? (flashUnitPrice * qty) + bacWaterCost : null
 
   const handleAdd = () => {
     if (isOutOfStock) return
@@ -138,7 +146,10 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
       pack3Price: siteConfig?.pack3Price || (singleBasePrice * 2.5),
       includeBacWater,
       bacWaterQty: includeBacWater ? bacWaterQty : 0,
-      bacWaterUnitPrice: bacWaterUnitPrice
+      bacWaterUnitPrice: bacWaterUnitPrice,
+      // Pass flash sale context so cart can apply correct price
+      flashSaleUnitPrice: flashQtyOk ? flashUnitPrice : null,
+      flashSaleActive: flashQtyOk
     })
   }
 
@@ -216,8 +227,23 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
 
               {/* RIGHT COLUMN: FLASH SALE BADGE + PRICE */}
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                {/* FLASH SALE BADGE */}
-                {flashApplies && (
+                {/* FLASH SALE BADGE or waiting badge */}
+                {flashApplies && !flashQtyOk && (
+                  <span style={{
+                    background: '#f59e0b',
+                    color: '#fff',
+                    fontSize: '0.6rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.06em',
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '99px',
+                    marginBottom: '0.3rem',
+                    display: 'inline-block'
+                  }}>
+                    ⚡ FLASH — dès {flashMinQty} fiole{flashMinQty > 1 ? 's' : ''}
+                  </span>
+                )}
+                {flashQtyOk && (
                   <span style={{
                     background: 'linear-gradient(90deg, #b45309, #d97706)',
                     color: '#fff',
@@ -229,12 +255,12 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                     marginBottom: '0.3rem',
                     display: 'inline-block'
                   }}>
-                    ⚡ FLASH SALE
+                    ⚡ FLASH SALE ACTIVE
                   </span>
                 )}
 
                 {/* PRIX BARRÉ (ancien prix) */}
-                {(hasDiscount || flashApplies) && (
+                {(hasDiscount || flashQtyOk) && (
                   <span style={{ 
                     fontSize: '0.9rem', 
                     color: '#64748b', 
@@ -243,8 +269,8 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                     lineHeight: 1,
                     marginBottom: '0.15rem'
                   }}>
-                    {flashApplies
-                      ? `${singleBasePrice.toFixed(2).replace('.', ',')} €`
+                    {flashQtyOk
+                      ? `${(singleBasePrice * qty + bacWaterCost).toFixed(2).replace('.', ',')} €`
                       : `${totalUnpromotedPrice.toFixed(2).replace('.', ',')} €`
                     }
                   </span>
@@ -255,19 +281,23 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                   fontSize: '1.85rem', 
                   fontWeight: 900, 
                   letterSpacing: '-0.03em', 
-                  color: flashApplies ? '#d97706' : 'var(--black)',
+                  color: flashQtyOk ? '#d97706' : 'var(--black)',
                   lineHeight: 1
                 }}>
-                  {flashApplies
-                    ? `${flashBasePrice.toFixed(2).replace('.', ',')} €`
+                  {flashQtyOk
+                    ? `${flashTotalPrice.toFixed(2).replace('.', ',')} €`
                     : `${totalPrice.toFixed(2).replace('.', ',')} €`
                   }
                 </span>
 
                 {/* LABEL SOUS LE PRIX */}
-                {flashApplies ? (
+                {flashQtyOk ? (
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', marginTop: '0.2rem' }}>
-                    {flashSale.discountType === 'percent' ? `-${flashSale.discountValue}% FLASH SALE` : `-${flashSale.discountValue}€ FLASH SALE`}
+                    {flashSale.discountType === 'percent' ? `-${flashSale.discountValue}% / FIOLE` : `-${flashSale.discountValue}€ / FIOLE`}
+                  </span>
+                ) : flashApplies && !flashQtyOk ? (
+                  <span style={{ fontSize: '0.63rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.2rem' }}>
+                    Prix Flash dès {flashMinQty} fiole{flashMinQty > 1 ? 's' : ''}
                   </span>
                 ) : numDiscountedVials > 0 ? (
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', marginTop: '0.2rem' }}>
