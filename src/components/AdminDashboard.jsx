@@ -804,102 +804,171 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
             )}
 
             {/* TAB: FLASH SALE */}
-            {activeTab === 'flashsale' && (
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '0.3rem' }}>⚡ GESTIONNAIRE FLASH SALE</h3>
-                <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '1.4rem' }}>
-                  Activez une vente flash limitée dans le temps. Un badge s'affichera sur votre site avec une réduction active.
-                </p>
+            {activeTab === 'flashsale' && (() => {
+              // Live price preview
+              const retaPrice = config?.products?.RETA?.price || 60
+              const ghkPrice = config?.products?.['GHK-Cu']?.price || 50
+              const dv = parseFloat(flashSaleForm.discountValue) || 0
+              const calcFlashPrice = (base) => {
+                if (!dv) return base
+                if (flashSaleForm.discountType === 'percent') return Math.max(0, base * (1 - dv / 100))
+                return Math.max(0, base - dv)
+              }
+              const retaFlash = calcFlashPrice(retaPrice)
+              const ghkFlash = calcFlashPrice(ghkPrice)
+              const isFormValid = flashSaleForm.label && flashSaleForm.discountValue && flashSaleForm.endDate && flashSaleForm.endTime && flashSaleForm.products?.length > 0
+              return (
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '0.3rem' }}>⚡ GESTIONNAIRE FLASH SALE</h3>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '1.4rem' }}>
+                    Activez une vente flash limitée dans le temps. Un <strong>compte à rebours</strong> apparaîtra en haut du site et le prix réduit s'affichera directement sur la fiche produit.
+                  </p>
 
-                {/* CURRENT STATUS */}
-                <div style={{ padding: '1rem 1.2rem', borderRadius: '10px', marginBottom: '1.5rem', border: config?.flashSale?.active ? '2px solid #f59e0b' : '1.5px solid #e2e8f0', background: config?.flashSale?.active ? '#fffbeb' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div>
-                    <p style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--gray-600)', margin: '0 0 0.2rem 0' }}>STATUT ACTUEL</p>
-                    {config?.flashSale?.active ? (
-                      <p style={{ margin: 0, fontWeight: 900, color: '#d97706', fontSize: '0.9rem' }}>
-                        🔥 FLASH SALE EN COURS — {config.flashSale.label || 'Offre exclusive'}
-                        {config.flashSale.discountType === 'percent' ? ` (-${config.flashSale.discountValue}%)` : ` (-${config.flashSale.discountValue}€)`}
-                        {config.flashSale.endsAt && <span style={{ fontSize: '0.72rem', color: '#92400e', display: 'block', marginTop: '0.2rem' }}>Expire le : {new Date(config.flashSale.endsAt).toLocaleString('fr-FR')}</span>}
-                      </p>
-                    ) : (
-                      <p style={{ margin: 0, fontWeight: 700, color: 'var(--gray-500)', fontSize: '0.85rem' }}>Aucune Flash Sale active.</p>
+                  {/* CURRENT STATUS BANNER */}
+                  <div style={{ padding: '1rem 1.2rem', borderRadius: '10px', marginBottom: '1.5rem', border: config?.flashSale?.active ? '2px solid #f59e0b' : '1.5px solid #e2e8f0', background: config?.flashSale?.active ? '#fffbeb' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                      <p style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--gray-600)', margin: '0 0 0.2rem 0' }}>STATUT ACTUEL</p>
+                      {config?.flashSale?.active ? (
+                        <div>
+                          <p style={{ margin: '0 0 0.2rem 0', fontWeight: 900, color: '#d97706', fontSize: '0.9rem' }}>
+                            🔥 FLASH SALE EN COURS — {config.flashSale.label}
+                          </p>
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>
+                            Produit(s) : {(config.flashSale.products || []).join(' + ')} &nbsp;·&nbsp;
+                            Remise : {config.flashSale.discountType === 'percent' ? `-${config.flashSale.discountValue}%` : `-${config.flashSale.discountValue} €`}
+                          </p>
+                          {config.flashSale.endsAt && <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.72rem', color: '#92400e' }}>Expire le : {new Date(config.flashSale.endsAt).toLocaleString('fr-FR')}</p>}
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, fontWeight: 700, color: 'var(--gray-500)', fontSize: '0.85rem' }}>Aucune Flash Sale active pour le moment.</p>
+                      )}
+                    </div>
+                    {config?.flashSale?.active && (
+                      <button type="button" onClick={() => updateAndSaveConfig({ ...config, flashSale: { ...config.flashSale, active: false } })}
+                        style={{ padding: '0.5rem 1rem', fontWeight: 900, fontSize: '0.75rem', borderRadius: '7px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer' }}>
+                        🛑 DÉSACTIVER
+                      </button>
                     )}
                   </div>
-                  {config?.flashSale?.active && (
-                    <button
-                      type="button"
-                      onClick={() => updateAndSaveConfig({ ...config, flashSale: { ...config.flashSale, active: false } })}
-                      style={{ padding: '0.5rem 1rem', fontWeight: 900, fontSize: '0.75rem', borderRadius: '7px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer' }}
-                    >
-                      🛑 DÉSACTIVER LA FLASH SALE
-                    </button>
-                  )}
-                </div>
 
-                {/* CREATE FLASH SALE FORM */}
-                <div style={{ padding: '1.4rem', border: '1.5px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}>
-                  <h4 style={{ fontSize: '0.9rem', fontWeight: 900, margin: '0 0 1rem 0' }}>CONFIGURER UNE NOUVELLE FLASH SALE</h4>
-                  <div style={{ display: 'grid', gap: '1rem' }}>
+                  {/* FORM */}
+                  <div style={{ padding: '1.4rem', border: '1.5px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', display: 'grid', gap: '1.1rem' }}>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 900, margin: 0 }}>CONFIGURER UNE NOUVELLE FLASH SALE</h4>
 
+                    {/* LIBELLÉ */}
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Libellé de l'offre</label>
-                      <input
-                        type="text"
-                        value={flashSaleForm.label}
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Libellé affiché sur la barre de comptage</label>
+                      <input type="text" value={flashSaleForm.label}
                         onChange={e => setFlashSaleForm(f => ({ ...f, label: e.target.value }))}
-                        placeholder="ex: OFFRE RENTRÉE — Fioles RETA"
-                        style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.88rem' }}
-                      />
+                        placeholder="ex: ⚡ VENTE FLASH — Offre limitée sur RETA"
+                        style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.88rem' }} />
                     </div>
 
+                    {/* PRODUIT CONCERNÉ */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.5rem', textTransform: 'uppercase' }}>Produit(s) en promotion</label>
+                      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        {['RETA', 'GHK-Cu', 'Les deux'].map(prod => {
+                          const selected = prod === 'Les deux'
+                            ? (flashSaleForm.products || []).includes('RETA') && (flashSaleForm.products || []).includes('GHK-Cu')
+                            : (flashSaleForm.products || []).includes(prod)
+                          return (
+                            <button key={prod} type="button"
+                              onClick={() => {
+                                if (prod === 'Les deux') {
+                                  setFlashSaleForm(f => ({ ...f, products: ['RETA', 'GHK-Cu'] }))
+                                } else {
+                                  const cur = flashSaleForm.products || []
+                                  const next = cur.includes(prod) ? cur.filter(p => p !== prod) : [...cur.filter(p => p !== 'RETA' || prod !== 'RETA'), prod]
+                                  setFlashSaleForm(f => ({ ...f, products: [...new Set(next)] }))
+                                }
+                              }}
+                              style={{
+                                padding: '0.5rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, borderRadius: '7px', cursor: 'pointer',
+                                border: selected ? '2px solid #f59e0b' : '1px solid #cbd5e1',
+                                background: selected ? '#fffbeb' : '#ffffff',
+                                color: selected ? '#d97706' : 'var(--black)'
+                              }}>
+                              {prod === 'RETA' ? '⚗️ RETA (10MG)' : prod === 'GHK-Cu' ? '🧬 GHK-Cu (100MG)' : '⚡ Les deux'}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {(!flashSaleForm.products || flashSaleForm.products.length === 0) && (
+                        <p style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 700, margin: '0.3rem 0 0 0' }}>⚠ Sélectionnez au moins un produit</p>
+                      )}
+                    </div>
+
+                    {/* TYPE + VALEUR RÉDUCTION */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Type de réduction</label>
-                        <select
-                          value={flashSaleForm.discountType}
+                        <select value={flashSaleForm.discountType}
                           onChange={e => setFlashSaleForm(f => ({ ...f, discountType: e.target.value }))}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
-                        >
-                          <option value="percent">Pourcentage (%)</option>
-                          <option value="fixed">Montant fixe (€)</option>
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}>
+                          <option value="percent">Pourcentage — ex: -20%</option>
+                          <option value="fixed">Montant fixe — ex: -15 €</option>
                         </select>
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Valeur</label>
-                        <input
-                          type="number" min={1}
-                          value={flashSaleForm.discountValue}
-                          onChange={e => setFlashSaleForm(f => ({ ...f, discountValue: e.target.value }))}
-                          placeholder={flashSaleForm.discountType === 'percent' ? 'ex: 20' : 'ex: 15'}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 800 }}
-                        />
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                          {flashSaleForm.discountType === 'percent' ? 'Réduction (%)' : 'Réduction (€)'}
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <input type="number" min={1}
+                            value={flashSaleForm.discountValue}
+                            onChange={e => setFlashSaleForm(f => ({ ...f, discountValue: e.target.value }))}
+                            placeholder={flashSaleForm.discountType === 'percent' ? 'ex: 20' : 'ex: 15'}
+                            style={{ width: '100%', padding: '0.65rem 2rem 0.65rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 800, boxSizing: 'border-box' }} />
+                          <span style={{ position: 'absolute', right: '0.6rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#64748b' }}>
+                            {flashSaleForm.discountType === 'percent' ? '%' : '€'}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
+                    {/* PREVIEW PRIX */}
+                    {dv > 0 && flashSaleForm.products?.length > 0 && (
+                      <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '8px', padding: '0.8rem 1rem', display: 'grid', gap: '0.4rem' }}>
+                        <p style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#92400e', margin: '0 0 0.4rem 0' }}>APERÇU DES PRIX APRÈS RÉDUCTION</p>
+                        {flashSaleForm.products.includes('RETA') && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                            <span style={{ fontWeight: 700 }}>RETA (10MG)</span>
+                            <span>
+                              <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{retaPrice.toFixed(2)} €</span>
+                              <span style={{ fontWeight: 900, color: '#d97706', fontSize: '1rem' }}>{retaFlash.toFixed(2)} €</span>
+                            </span>
+                          </div>
+                        )}
+                        {flashSaleForm.products.includes('GHK-Cu') && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                            <span style={{ fontWeight: 700 }}>GHK-Cu (100MG)</span>
+                            <span>
+                              <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{ghkPrice.toFixed(2)} €</span>
+                              <span style={{ fontWeight: 900, color: '#d97706', fontSize: '1rem' }}>{ghkFlash.toFixed(2)} €</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* DATE + HEURE FIN */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Date de fin</label>
-                        <input
-                          type="date"
-                          value={flashSaleForm.endDate}
+                        <input type="date" value={flashSaleForm.endDate}
                           onChange={e => setFlashSaleForm(f => ({ ...f, endDate: e.target.value }))}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
-                        />
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }} />
                       </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem', textTransform: 'uppercase' }}>Heure de fin</label>
-                        <input
-                          type="time"
-                          value={flashSaleForm.endTime}
+                        <input type="time" value={flashSaleForm.endTime}
                           onChange={e => setFlashSaleForm(f => ({ ...f, endTime: e.target.value }))}
-                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
-                        />
+                          style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }} />
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={!flashSaleForm.label || !flashSaleForm.discountValue || !flashSaleForm.endDate || !flashSaleForm.endTime}
+                    <button type="button" disabled={!isFormValid}
                       onClick={() => {
                         const endDateTime = new Date(`${flashSaleForm.endDate}T${flashSaleForm.endTime}`)
                         updateAndSaveConfig({
@@ -907,6 +976,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                           flashSale: {
                             active: true,
                             label: flashSaleForm.label,
+                            products: flashSaleForm.products,
                             discountType: flashSaleForm.discountType,
                             discountValue: parseFloat(flashSaleForm.discountValue),
                             endsAt: endDateTime.toISOString()
@@ -916,19 +986,18 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                         setTimeout(() => setSaveMessage(''), 4000)
                       }}
                       style={{
-                        width: '100%', padding: '0.9rem', fontWeight: 900, fontSize: '0.85rem',
-                        borderRadius: '8px', border: 'none', cursor: 'pointer',
-                        background: (!flashSaleForm.label || !flashSaleForm.discountValue || !flashSaleForm.endDate || !flashSaleForm.endTime) ? '#cbd5e1' : '#f59e0b',
+                        width: '100%', padding: '0.95rem', fontWeight: 900, fontSize: '0.88rem',
+                        borderRadius: '8px', border: 'none', cursor: isFormValid ? 'pointer' : 'not-allowed',
+                        background: isFormValid ? '#f59e0b' : '#cbd5e1',
                         color: '#ffffff',
-                        opacity: (!flashSaleForm.label || !flashSaleForm.discountValue || !flashSaleForm.endDate || !flashSaleForm.endTime) ? 0.6 : 1
-                      }}
-                    >
-                      ⚡ ACTIVER LA FLASH SALE EN DIRECT
+                        transition: 'all 0.2s'
+                      }}>
+                      ⚡ LANCER LA FLASH SALE EN DIRECT
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* TAB: MÉMO ADMIN */}
             {activeTab === 'memo' && (

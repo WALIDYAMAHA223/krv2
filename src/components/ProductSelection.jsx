@@ -118,6 +118,16 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
   const totalPrice = productTotal + bacWaterCost
   const totalUnpromotedPrice = unpromotedProductTotal + bacWaterCost
 
+  // FLASH SALE — compute discounted unit price if active and applies to this product
+  const flashSale = siteConfig?.flashSale
+  const flashActive = flashSale?.active && flashSale?.endsAt && new Date(flashSale.endsAt) > new Date()
+  const flashApplies = flashActive && (flashSale.products || []).includes(activeTab)
+  const flashBasePrice = flashApplies ? (
+    flashSale.discountType === 'percent'
+      ? Math.max(0, singleBasePrice * (1 - flashSale.discountValue / 100))
+      : Math.max(0, singleBasePrice - flashSale.discountValue)
+  ) : null
+
   const handleAdd = () => {
     if (isOutOfStock) return
     onAddToCart({
@@ -204,9 +214,27 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                 {activeTab} <span style={{ fontWeight: 800 }}>{dosage}</span>
               </h2>
 
-              {/* RIGHT COLUMN: STRIKETHROUGH PRICE DIRECTLY ABOVE MAIN PRICE */}
+              {/* RIGHT COLUMN: FLASH SALE BADGE + PRICE */}
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                {hasDiscount && (
+                {/* FLASH SALE BADGE */}
+                {flashApplies && (
+                  <span style={{
+                    background: 'linear-gradient(90deg, #b45309, #d97706)',
+                    color: '#fff',
+                    fontSize: '0.6rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.08em',
+                    padding: '0.15rem 0.55rem',
+                    borderRadius: '99px',
+                    marginBottom: '0.3rem',
+                    display: 'inline-block'
+                  }}>
+                    ⚡ FLASH SALE
+                  </span>
+                )}
+
+                {/* PRIX BARRÉ (ancien prix) */}
+                {(hasDiscount || flashApplies) && (
                   <span style={{ 
                     fontSize: '0.9rem', 
                     color: '#64748b', 
@@ -215,38 +243,38 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                     lineHeight: 1,
                     marginBottom: '0.15rem'
                   }}>
-                    {totalUnpromotedPrice.toFixed(2).replace('.', ',')} €
+                    {flashApplies
+                      ? `${singleBasePrice.toFixed(2).replace('.', ',')} €`
+                      : `${totalUnpromotedPrice.toFixed(2).replace('.', ',')} €`
+                    }
                   </span>
                 )}
 
+                {/* PRIX PRINCIPAL */}
                 <span style={{ 
                   fontSize: '1.85rem', 
                   fontWeight: 900, 
                   letterSpacing: '-0.03em', 
-                  color: 'var(--black)',
+                  color: flashApplies ? '#d97706' : 'var(--black)',
                   lineHeight: 1
                 }}>
-                  {totalPrice.toFixed(2).replace('.', ',')} €
+                  {flashApplies
+                    ? `${flashBasePrice.toFixed(2).replace('.', ',')} €`
+                    : `${totalPrice.toFixed(2).replace('.', ',')} €`
+                  }
                 </span>
 
-                {numDiscountedVials > 0 ? (
-                  <span style={{ 
-                    fontSize: '0.65rem', 
-                    fontWeight: 800, 
-                    color: '#15803d', 
-                    textTransform: 'uppercase', 
-                    marginTop: '0.2rem' 
-                  }}>
+                {/* LABEL SOUS LE PRIX */}
+                {flashApplies ? (
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', marginTop: '0.2rem' }}>
+                    {flashSale.discountType === 'percent' ? `-${flashSale.discountValue}% FLASH SALE` : `-${flashSale.discountValue}€ FLASH SALE`}
+                  </span>
+                ) : numDiscountedVials > 0 ? (
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', marginTop: '0.2rem' }}>
                     -50% SUR CHAQUE 3E FIOLE
                   </span>
                 ) : (originalUnitPrice > singleBasePrice) ? (
-                  <span style={{ 
-                    fontSize: '0.65rem', 
-                    fontWeight: 800, 
-                    color: '#15803d', 
-                    textTransform: 'uppercase', 
-                    marginTop: '0.2rem' 
-                  }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', marginTop: '0.2rem' }}>
                     PRIX EN PROMOTION
                   </span>
                 ) : null}

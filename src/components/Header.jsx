@@ -25,6 +25,28 @@ const CloseIcon = () => (
 export default function Header({ onCartClick, cartCount, siteConfig }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const announcement = siteConfig?.announcement
+  const flashSale = siteConfig?.flashSale
+
+  // Live countdown for flash sale
+  const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0, expired: false })
+
+  useEffect(() => {
+    if (!flashSale?.active || !flashSale?.endsAt) return
+    const tick = () => {
+      const diff = new Date(flashSale.endsAt) - Date.now()
+      if (diff <= 0) { setCountdown({ h: 0, m: 0, s: 0, expired: true }); return }
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setCountdown({ h, m, s, expired: false })
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [flashSale?.active, flashSale?.endsAt])
+
+  const pad = (n) => String(n).padStart(2, '0')
+  const showFlashBar = flashSale?.active && !countdown.expired
 
   // Lock body scroll when mobile menu is active
   useEffect(() => {
@@ -88,6 +110,55 @@ export default function Header({ onCartClick, cartCount, siteConfig }) {
               {announcement.linkText}
             </a>
           )}
+        </div>
+      )}
+
+      {/* FLASH SALE COUNTDOWN BAR */}
+      {showFlashBar && (
+        <div style={{
+          background: 'linear-gradient(90deg, #b45309 0%, #d97706 50%, #b45309 100%)',
+          color: '#ffffff',
+          fontSize: '0.72rem',
+          fontWeight: 800,
+          letterSpacing: '0.05em',
+          padding: '0.45rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1rem',
+          flexWrap: 'wrap',
+          textAlign: 'center'
+        }}>
+          <span>🔥 {flashSale.label}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <span style={{ fontSize: '0.64rem', fontWeight: 700, opacity: 0.85 }}>Se termine dans</span>
+            {[
+              { val: countdown.h, label: 'H' },
+              { val: countdown.m, label: 'MIN' },
+              { val: countdown.s, label: 'SEC' }
+            ].map(({ val, label }, i) => (
+              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                {i > 0 && <span style={{ opacity: 0.6, marginRight: '0.1rem' }}>:</span>}
+                <span style={{
+                  background: 'rgba(0,0,0,0.3)',
+                  borderRadius: '4px',
+                  padding: '0.1rem 0.35rem',
+                  fontFamily: 'monospace',
+                  fontSize: '0.82rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.04em',
+                  minWidth: '28px',
+                  textAlign: 'center'
+                }}>
+                  {pad(val)}
+                </span>
+                <span style={{ fontSize: '0.55rem', fontWeight: 700, opacity: 0.75 }}>{label}</span>
+              </span>
+            ))}
+          </span>
+          <a href="#selection" style={{ color: '#fff', background: 'rgba(0,0,0,0.25)', padding: '0.2rem 0.7rem', borderRadius: '4px', textDecoration: 'none', fontSize: '0.65rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
+            EN PROFITER ➜
+          </a>
         </div>
       )}
 
