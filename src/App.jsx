@@ -130,9 +130,10 @@ export default function App() {
           ...DEFAULT_SITE_CONFIG,
           ...parsed,
           products: {
-            RETA: { ...DEFAULT_SITE_CONFIG.products.RETA, ...parsed.products?.RETA },
-            'GHK-Cu': { ...DEFAULT_SITE_CONFIG.products['GHK-Cu'], ...parsed.products?.['GHK-Cu'] }
+            RETA: { ...DEFAULT_SITE_CONFIG.products.RETA, ...(parsed.products?.RETA || {}) },
+            'GHK-Cu': { ...DEFAULT_SITE_CONFIG.products['GHK-Cu'], ...(parsed.products?.['GHK-Cu'] || {}) }
           },
+          announcement: { ...DEFAULT_SITE_CONFIG.announcement, ...(parsed.announcement || {}) },
           promoCodes: parsed.promoCodes || DEFAULT_SITE_CONFIG.promoCodes,
           whatsappNumber: (parsed.whatsappNumber && parsed.whatsappNumber !== '33700000000') ? parsed.whatsappNumber : '32465983104'
         }
