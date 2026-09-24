@@ -36,36 +36,82 @@ export const formatCleanName = (nameStr) => {
 export const calculateItemPricing = (item, siteConfig) => {
   const cleanName = formatCleanName(item.name)
   const isGHK = cleanName.includes('GHK')
+  const cleanDsg = formatCleanDosage(item.dosage)
   const prodConfig = isGHK ? siteConfig?.products?.['GHK-Cu'] : siteConfig?.products?.['RETA']
-  const basePrice = item.singleBasePrice || (prodConfig?.price || (isGHK ? 50 : 60))
-  const originalUnitPrice = (prodConfig?.originalPrice && Number(prodConfig.originalPrice) > basePrice) 
-    ? Number(prodConfig.originalPrice) 
+
+  const dosageData = (!isGHK && prodConfig?.dosages?.[cleanDsg])
+    ? prodConfig.dosages[cleanDsg]
+    : (!isGHK && cleanDsg === '20MG')
+      ? { price: 95, originalPrice: 0 }
+      : prodConfig
+
+  const basePrice = item.singleBasePrice || (dosageData?.price || (isGHK ? 50 : (cleanDsg === '20MG' ? 95 : 60)))
+  const originalUnitPrice = (dosageData?.originalPrice && Number(dosageData.originalPrice) > basePrice) 
+    ? Number(dosageData.originalPrice) 
     : basePrice
   
   const qty = item.qty || 1
 
   // ── FLASH SALE: override all peptide pricing with the flash unit price ──
-  const flashUnitPrice = item.flashSaleUnitPrice  // passed from ProductSelection
-  const flashSaleActive = item.flashSaleActive && flashUnitPrice != null
+  const flashSale = siteConfig?.flashSale
+  const flashActive = flashSale?.active && flashSale?.endsAt && new Date(flashSale.endsAt) > new Date()
+  const flashMinQty = flashSale?.minQty || 1
+
+  const isFlashApplicableToItem = () => {
+    if (!flashActive) return false
+    const prods = flashSale?.products || []
+    if (prods.includes('Tous')) return true
+    if (!isGHK) {
+      if (cleanDsg === '10MG') {
+        return prods.includes('RETA-10MG') || prods.includes('RETA (10MG)') || prods.includes('RETA')
+      }
+      if (cleanDsg === '20MG') {
+        return prods.includes('RETA-20MG') || prods.includes('RETA (20MG)')
+      }
+      return prods.includes('RETA')
+    } else {
+      return prods.includes('GHK-Cu') || prods.includes('GHK-Cu (100MG)')
+    }
+  }
+
+  const flashApplies = isFlashApplicableToItem()
+  const flashQtyOk = flashApplies && qty >= flashMinQty
+
+  let dynamicFlashUnitPrice = null
+  if (flashApplies) {
+    if (flashSale.discountType === 'percent') {
+      dynamicFlashUnitPrice = Math.max(0, basePrice * (1 - flashSale.discountValue / 100))
+    } else if (flashSale.discountType === 'fixed') {
+      dynamicFlashUnitPrice = Math.max(0, basePrice - flashSale.discountValue)
+    } else {
+      dynamicFlashUnitPrice = Math.max(0, flashSale.discountValue)
+    }
+  }
+
+  const flashUnitPrice = dynamicFlashUnitPrice ?? item.flashSaleUnitPrice
+  const flashSaleActive = (flashActive && flashApplies) ? flashQtyOk : (item.flashSaleActive && flashUnitPrice != null)
+
+  const packs = Math.floor(qty / 3)
+  const remainder = qty % 3
+
+  // Base Pack 3 pricing: 50% discount on every 3rd vial
+  const basePack3Price = item.pack3Price || (
+    cleanDsg === '20MG'
+      ? (siteConfig?.pack3Price20 !== undefined ? Number(siteConfig.pack3Price20) : (basePrice * 2.5))
+      : ((basePrice === 60 && siteConfig?.pack3Price) ? siteConfig.pack3Price : (basePrice * 2.5))
+  )
 
   let peptideCost, unpromotedPeptideCost, hasPromo, hasPackPromo, hasPricePromo
 
   if (flashSaleActive) {
-    peptideCost = flashUnitPrice * qty
-    unpromotedPeptideCost = basePrice * qty
-    hasPackPromo = false
-    hasPricePromo = false
-    hasPromo = true  // treat flash sale as a promo for badge display
+    const flashPack3Price = Math.min(basePack3Price, flashUnitPrice * 2.5)
+    peptideCost = (packs * flashPack3Price) + (remainder * flashUnitPrice)
+    unpromotedPeptideCost = qty * originalUnitPrice
+    hasPackPromo = packs > 0
+    hasPricePromo = true
+    hasPromo = true
   } else {
-    const packs = Math.floor(qty / 3)
-    const remainder = qty % 3
-    
-    // Pack 3 pricing: 50% discount on every 3rd vial
-    const pack3PriceConfig = (basePrice === 60 && siteConfig?.pack3Price) 
-      ? siteConfig.pack3Price 
-      : (basePrice * 2.5)
-    
-    peptideCost = (packs * pack3PriceConfig) + (remainder * basePrice)
+    peptideCost = (packs * basePack3Price) + (remainder * basePrice)
     unpromotedPeptideCost = qty * originalUnitPrice
     hasPackPromo = packs > 0
     hasPricePromo = originalUnitPrice > basePrice
@@ -164,9 +210,13 @@ export default function OrderModal({
   const whatsappLines = cartItems.map((item, idx) => {
     const ci = computedItems[idx]
     const cleanDsg = formatCleanDosage(item.dosage)
-    const promoStr = ci.hasPackPromo 
-      ? ' (Pack 3 Fioles -50% appliqué sur la 3ème fiole)' 
-      : (ci.hasPricePromo ? ` (Prix Promo: ~${ci.unpromotedPeptideCost.toFixed(2)}€~ ${ci.peptideCost.toFixed(2)}€)` : '')
+    const promoStr = (ci.flashSaleActive && ci.hasPackPromo)
+      ? ` (⚡ Vente Flash + Pack 3 Fioles -50%: ~${ci.unpromotedPeptideCost.toFixed(2)}€~ ${ci.peptideCost.toFixed(2)}€)`
+      : ci.flashSaleActive
+        ? ` (⚡ Vente Flash appliquée: ~${ci.unpromotedPeptideCost.toFixed(2)}€~ ${ci.peptideCost.toFixed(2)}€)`
+        : (ci.hasPackPromo 
+          ? ' (Pack 3 Fioles -50% appliqué sur la 3ème fiole)' 
+          : (ci.hasPricePromo ? ` (Prix Promo: ~${ci.unpromotedPeptideCost.toFixed(2)}€~ ${ci.peptideCost.toFixed(2)}€)` : ''))
     let line = `• *${ci.cleanName} ${cleanDsg}* (x${ci.qty} fiole${ci.qty > 1 ? 's' : ''}) — ${ci.peptideCost.toFixed(2)}€${promoStr}`
     if (ci.bacQty > 0) {
       line += `\n  └ Option Eau Bactériostatique (x${ci.bacQty}) : +${ci.bacCost.toFixed(2)}€ (${ci.unitBacPrice.toFixed(2)}€/u)`
@@ -347,11 +397,13 @@ export default function OrderModal({
                     {(ci.hasPromo || ci.flashSaleActive) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: ci.flashSaleActive ? '#fffbeb' : '#dcfce7', color: ci.flashSaleActive ? '#d97706' : '#15803d', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
                         <span>
-                          {ci.flashSaleActive
-                            ? `⚡ FLASH SALE APPLIQUÉE — ${ci.flashUnitPrice.toFixed(2)}€/fiole au lieu de ${ci.basePrice.toFixed(2)}€`
-                            : ci.hasPackPromo 
-                              ? 'PROMO APPLIQUÉE : Pack 3 Fioles (-50% sur la 3ème fiole)' 
-                              : `PROMO APPLIQUÉE : Offre Spéciale (-${(ci.unpromotedPeptideCost - ci.peptideCost).toFixed(2).replace('.', ',')} €)`
+                          {ci.flashSaleActive && ci.hasPackPromo
+                            ? `⚡ FLASH SALE + PACK 3 FIOLES — ${ci.flashUnitPrice.toFixed(2)}€/fiole & 3e fiole à -50%`
+                            : ci.flashSaleActive
+                              ? `⚡ FLASH SALE APPLIQUÉE — ${ci.flashUnitPrice.toFixed(2)}€/fiole au lieu de ${ci.basePrice.toFixed(2)}€`
+                              : ci.hasPackPromo 
+                                ? 'PROMO APPLIQUÉE : Pack 3 Fioles (-50% sur la 3ème fiole)' 
+                                : `PROMO APPLIQUÉE : Offre Spéciale (-${(ci.unpromotedPeptideCost - ci.peptideCost).toFixed(2).replace('.', ',')} €)`
                           }
                         </span>
                       </div>

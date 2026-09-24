@@ -148,6 +148,38 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     products: []
   })
 
+  useEffect(() => {
+    if (config?.flashSale) {
+      const fs = config.flashSale
+      let ed = ''
+      let et = ''
+      if (fs.endsAt) {
+        try {
+          const d = new Date(fs.endsAt)
+          if (!isNaN(d.getTime())) {
+            const pad = (n) => String(n).padStart(2, '0')
+            ed = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+            et = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+          }
+        } catch (e) {}
+      }
+      setFlashSaleForm(prev => {
+        if (!prev.label && !prev.discountValue) {
+          return {
+            label: fs.label || '',
+            endDate: ed,
+            endTime: et,
+            discountType: fs.discountType || 'percent',
+            discountValue: fs.discountValue ? String(fs.discountValue) : '',
+            minQty: fs.minQty ? String(fs.minQty) : '1',
+            products: fs.products || []
+          }
+        }
+        return prev
+      })
+    }
+  }, [config?.flashSale])
+
   // Promo code management state
   const [newPromoCode, setNewPromoCode] = useState('')
   const [newPromoType, setNewPromoType] = useState('percent')
@@ -271,7 +303,18 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
   }
 
   const calcManualSale = () => {
-    const basePrice = manualProd === 'RETA' ? (config.products?.RETA?.price || 60) : (config.products?.['GHK-Cu']?.price || 50)
+    let basePrice
+    let defaultPack3
+    if (manualProd === 'RETA-20MG') {
+      basePrice = config.products?.RETA?.dosages?.['20MG']?.price || 95
+      defaultPack3 = config.pack3Price20 || (basePrice * 2.5)
+    } else if (manualProd === 'RETA' || manualProd === 'RETA-10MG') {
+      basePrice = config.products?.RETA?.dosages?.['10MG']?.price || (config.products?.RETA?.price || 60)
+      defaultPack3 = (basePrice === 60 && config.pack3Price) ? config.pack3Price : (basePrice * 2.5)
+    } else {
+      basePrice = config.products?.['GHK-Cu']?.price || 50
+      defaultPack3 = basePrice * 2.5
+    }
     const bacPrice = config.bacWaterPrice || 3
     const bacCost = manualBac ? (manualQty * bacPrice) : 0
     let peptideCost
@@ -280,8 +323,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     } else {
       const packs = Math.floor(manualQty / 3)
       const remainder = manualQty % 3
-      const pack3Price = (basePrice === 60 && config.pack3Price) ? config.pack3Price : (basePrice * 2.5)
-      peptideCost = (packs * pack3Price) + (remainder * basePrice)
+      peptideCost = (packs * defaultPack3) + (remainder * basePrice)
     }
     const grandTotal = peptideCost + bacCost
     return { peptideCost, bacCost, grandTotal }
@@ -291,14 +333,19 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
     e.preventDefault()
     const { peptideCost, bacCost, grandTotal } = calcManualSale()
 
+    const isReta20 = manualProd === 'RETA-20MG'
+    const isGHK = manualProd === 'GHK-Cu'
+    const prodName = isGHK ? 'GHK-Cu' : 'RETA'
+    const prodDosage = isReta20 ? '20MG' : (isGHK ? '100MG' : '10MG')
+
     const newOrder = {
       id: 'KB-M' + Math.floor(100000 + Math.random() * 900000),
       date: new Date().toISOString(),
       formattedDate: new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }),
       items: [
         {
-          name: manualProd,
-          dosage: manualProd === 'RETA' ? '10MG' : '100MG',
+          name: prodName,
+          dosage: prodDosage,
           qty: manualQty,
           peptideCost,
           bacQty: manualBac ? manualQty : 0,
@@ -808,7 +855,8 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
             {/* TAB: FLASH SALE */}
             {activeTab === 'flashsale' && (() => {
               // Live price preview
-              const retaPrice = config?.products?.RETA?.price || 60
+              const retaPrice = config?.products?.RETA?.dosages?.['10MG']?.price || (config?.products?.RETA?.price || 60)
+              const reta20Price = config?.products?.RETA?.dosages?.['20MG']?.price || 95
               const ghkPrice = config?.products?.['GHK-Cu']?.price || 50
               const dv = parseFloat(flashSaleForm.discountValue) || 0
               const calcFlashPrice = (base) => {
@@ -817,6 +865,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                 return Math.max(0, base - dv)
               }
               const retaFlash = calcFlashPrice(retaPrice)
+              const reta20Flash = calcFlashPrice(reta20Price)
               const ghkFlash = calcFlashPrice(ghkPrice)
               const isFormValid = flashSaleForm.label && flashSaleForm.discountValue && flashSaleForm.endDate && flashSaleForm.endTime && flashSaleForm.products?.length > 0
               return (
@@ -836,7 +885,12 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                             🔥 FLASH SALE EN COURS — {config.flashSale.label}
                           </p>
                           <p style={{ margin: 0, fontSize: '0.78rem', color: '#92400e', fontWeight: 700 }}>
-                            Produit(s) : {(config.flashSale.products || []).join(' + ')} &nbsp;·&nbsp;
+                            Produit(s) : {(config.flashSale.products || []).map(p => {
+                              if (p === 'RETA-10MG' || p === 'RETA') return 'RETA (10MG)'
+                              if (p === 'RETA-20MG') return 'RETA (20MG)'
+                              if (p === 'GHK-Cu') return 'GHK-Cu (100MG)'
+                              return p
+                            }).join(' + ')} &nbsp;·&nbsp;
                             Remise : {config.flashSale.discountType === 'percent' ? `-${config.flashSale.discountValue}%` : `-${config.flashSale.discountValue} €`}
                           </p>
                           {config.flashSale.endsAt && <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.72rem', color: '#92400e' }}>Expire le : {new Date(config.flashSale.endsAt).toLocaleString('fr-FR')}</p>}
@@ -870,28 +924,70 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                     <div>
                       <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.5rem', textTransform: 'uppercase' }}>Produit(s) en promotion</label>
                       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                        {['RETA', 'GHK-Cu', 'Les deux'].map(prod => {
-                          const selected = prod === 'Les deux'
-                            ? (flashSaleForm.products || []).includes('RETA') && (flashSaleForm.products || []).includes('GHK-Cu')
-                            : (flashSaleForm.products || []).includes(prod)
+                        {[
+                          { id: 'RETA-10MG', label: '⚗️ RETA (10MG)' },
+                          { id: 'RETA-20MG', label: '⚗️ RETA (20MG)' },
+                          { id: 'GHK-Cu', label: '🧬 GHK-Cu (100MG)' },
+                          { id: 'ALL', label: '⚡ Tous' }
+                        ].map(item => {
+                          const curProds = flashSaleForm.products || []
+                          const isReta10Sel = curProds.some(p => p === 'RETA-10MG' || p === 'RETA')
+                          const isReta20Sel = curProds.includes('RETA-20MG')
+                          const isGhkSel = curProds.includes('GHK-Cu')
+                          const isAllSel = isReta10Sel && isReta20Sel && isGhkSel
+
+                          const isSelected = item.id === 'ALL'
+                            ? isAllSel
+                            : item.id === 'RETA-10MG'
+                              ? isReta10Sel
+                              : item.id === 'RETA-20MG'
+                                ? isReta20Sel
+                                : isGhkSel
+
                           return (
-                            <button key={prod} type="button"
+                            <button
+                              key={item.id}
+                              type="button"
                               onClick={() => {
-                                if (prod === 'Les deux') {
-                                  setFlashSaleForm(f => ({ ...f, products: ['RETA', 'GHK-Cu'] }))
+                                if (item.id === 'ALL') {
+                                  if (isAllSel) {
+                                    setFlashSaleForm(f => ({ ...f, products: [] }))
+                                  } else {
+                                    setFlashSaleForm(f => ({ ...f, products: ['RETA-10MG', 'RETA-20MG', 'GHK-Cu'] }))
+                                  }
+                                } else if (item.id === 'RETA-10MG') {
+                                  if (isReta10Sel) {
+                                    setFlashSaleForm(f => ({
+                                      ...f,
+                                      products: (f.products || []).filter(p => p !== 'RETA-10MG' && p !== 'RETA')
+                                    }))
+                                  } else {
+                                    setFlashSaleForm(f => ({
+                                      ...f,
+                                      products: [...new Set([...(f.products || []), 'RETA-10MG'])]
+                                    }))
+                                  }
                                 } else {
                                   const cur = flashSaleForm.products || []
-                                  const next = cur.includes(prod) ? cur.filter(p => p !== prod) : [...cur.filter(p => p !== 'RETA' || prod !== 'RETA'), prod]
+                                  const next = cur.includes(item.id)
+                                    ? cur.filter(p => p !== item.id)
+                                    : [...cur, item.id]
                                   setFlashSaleForm(f => ({ ...f, products: [...new Set(next)] }))
                                 }
                               }}
                               style={{
-                                padding: '0.5rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, borderRadius: '7px', cursor: 'pointer',
-                                border: selected ? '2px solid #f59e0b' : '1px solid #cbd5e1',
-                                background: selected ? '#fffbeb' : '#ffffff',
-                                color: selected ? '#d97706' : 'var(--black)'
-                              }}>
-                              {prod === 'RETA' ? '⚗️ RETA (10MG)' : prod === 'GHK-Cu' ? '🧬 GHK-Cu (100MG)' : '⚡ Les deux'}
+                                padding: '0.5rem 1.1rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 800,
+                                borderRadius: '7px',
+                                cursor: 'pointer',
+                                border: isSelected ? '2px solid #f59e0b' : '1px solid #cbd5e1',
+                                background: isSelected ? '#fffbeb' : '#ffffff',
+                                color: isSelected ? '#d97706' : 'var(--black)',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {item.label}
                             </button>
                           )
                         })}
@@ -930,29 +1026,66 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                     </div>
 
                     {/* PREVIEW PRIX */}
-                    {dv > 0 && flashSaleForm.products?.length > 0 && (
-                      <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '8px', padding: '0.8rem 1rem', display: 'grid', gap: '0.4rem' }}>
-                        <p style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#92400e', margin: '0 0 0.4rem 0' }}>APERÇU DES PRIX APRÈS RÉDUCTION</p>
-                        {flashSaleForm.products.includes('RETA') && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                            <span style={{ fontWeight: 700 }}>RETA (10MG)</span>
-                            <span>
-                              <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{retaPrice.toFixed(2)} €</span>
-                              <span style={{ fontWeight: 900, color: '#d97706', fontSize: '1rem' }}>{retaFlash.toFixed(2)} €</span>
-                            </span>
+                    {dv > 0 && (flashSaleForm.products || []).length > 0 && (
+                      <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '8px', padding: '0.8rem 1rem', display: 'grid', gap: '0.6rem' }}>
+                        <p style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#92400e', margin: '0 0 0.2rem 0' }}>APERÇU DES PRIX APRÈS RÉDUCTION</p>
+                        {((flashSaleForm.products || []).includes('RETA-10MG') || (flashSaleForm.products || []).includes('RETA')) && (
+                          <div style={{ borderBottom: '1px dashed #fde68a', paddingBottom: '0.4rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ fontWeight: 700 }}>RETA (10MG) — À l'unité</span>
+                              <span>
+                                <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{retaPrice.toFixed(2)} €</span>
+                                <span style={{ fontWeight: 900, color: '#d97706', fontSize: '1rem' }}>{retaFlash.toFixed(2)} €</span>
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#92400e', marginTop: '0.15rem' }}>
+                              <span style={{ fontWeight: 600 }}>└ Pack 3 Fioles (-50% sur la 3e)</span>
+                              <span>
+                                <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.4rem' }}>{(config.pack3Price || 150).toFixed(2)} €</span>
+                                <span style={{ fontWeight: 900, color: '#d97706' }}>{(retaFlash * 2.5).toFixed(2)} €</span>
+                              </span>
+                            </div>
                           </div>
                         )}
-                        {flashSaleForm.products.includes('GHK-Cu') && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                            <span style={{ fontWeight: 700 }}>GHK-Cu (100MG)</span>
-                            <span>
-                              <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{ghkPrice.toFixed(2)} €</span>
-                              <span style={{ fontWeight: 900, color: '#d97706', fontSize: '1rem' }}>{ghkFlash.toFixed(2)} €</span>
-                            </span>
+                        {(flashSaleForm.products || []).includes('RETA-20MG') && (
+                          <div style={{ borderBottom: '1px dashed #fde68a', paddingBottom: '0.4rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ fontWeight: 700 }}>RETA (20MG) — À l'unité</span>
+                              <span>
+                                <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{reta20Price.toFixed(2)} €</span>
+                                <span style={{ fontWeight: 900, color: '#d97706', fontSize: '1rem' }}>{reta20Flash.toFixed(2)} €</span>
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#92400e', marginTop: '0.15rem' }}>
+                              <span style={{ fontWeight: 600 }}>└ Pack 3 Fioles (-50% sur la 3e)</span>
+                              <span>
+                                <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.4rem' }}>{(config.pack3Price20 !== undefined ? config.pack3Price20 : 237.5).toFixed(2)} €</span>
+                                <span style={{ fontWeight: 900, color: '#d97706' }}>{(reta20Flash * 2.5).toFixed(2)} €</span>
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {(flashSaleForm.products || []).includes('GHK-Cu') && (
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ fontWeight: 700 }}>GHK-Cu (100MG) — À l'unité</span>
+                              <span>
+                                <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{ghkPrice.toFixed(2)} €</span>
+                                <span style={{ fontWeight: 900, color: '#d97706', fontSize: '1rem' }}>{ghkFlash.toFixed(2)} €</span>
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#92400e', marginTop: '0.15rem' }}>
+                              <span style={{ fontWeight: 600 }}>└ Pack 3 Fioles (-50% sur la 3e)</span>
+                              <span>
+                                <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.4rem' }}>{(ghkPrice * 2.5).toFixed(2)} €</span>
+                                <span style={{ fontWeight: 900, color: '#d97706' }}>{(ghkFlash * 2.5).toFixed(2)} €</span>
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>
                     )}
+
 
                     {/* QUANTITÉ MINIMUM */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
@@ -1262,146 +1395,289 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
             )}
 
             {/* TAB 3: STOCKS & PRICING CONTROL */}
-            {activeTab === 'stocks' && (
-              <div>
-                <div style={{ display: 'grid', gap: '1.4rem' }}>
-                  
-                  {/* RETA PRODUCT CONTROL */}
-                  <div style={{ padding: '1.2rem', border: '1.5px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                      <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: 0 }}>RETA (Retatrutide 10mg)</h4>
-                      <span style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 900,
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '6px',
-                        background: config.products.RETA.stock > 0 ? '#dcfce7' : '#fee2e2',
-                        color: config.products.RETA.stock > 0 ? '#15803d' : '#ef4444'
-                      }}>
-                        {config.products.RETA.stock > 0 ? `🟢 EN STOCK (${config.products.RETA.stock})` : '🔴 RUPTURE DE STOCK'}
-                      </span>
-                    </div>
+            {activeTab === 'stocks' && (() => {
+              const reta10Stock = config.products?.RETA?.dosages?.['10MG']?.stock ?? (config.products?.RETA?.stock ?? 0)
+              const reta10Price = config.products?.RETA?.dosages?.['10MG']?.price ?? (config.products?.RETA?.price ?? 60)
+              const reta10Orig  = config.products?.RETA?.dosages?.['10MG']?.originalPrice ?? (config.products?.RETA?.originalPrice ?? 0)
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem' }}>
-                          STOCK DISPONIBLE (UNITÉS)
-                        </label>
-                        <input 
-                          type="number" 
-                          min={0}
-                          value={config.products.RETA.stock}
-                          onChange={(e) => updateAndSaveConfig({
-                            ...config,
-                            products: {
-                              ...config.products,
-                              RETA: { ...config.products.RETA, stock: parseInt(e.target.value) || 0 }
-                            }
-                          })}
-                          style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
-                        />
-                        {/* QUICK STOCK ADJUSTMENT BUTTONS */}
-                        <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.4rem' }}>
-                          {[-5, -1, 1, 5].map(delta => (
+              const reta20Stock = config.products?.RETA?.dosages?.['20MG']?.stock ?? 15
+              const reta20Price = config.products?.RETA?.dosages?.['20MG']?.price ?? 95
+              const reta20Orig  = config.products?.RETA?.dosages?.['20MG']?.originalPrice ?? 0
+
+              const updateReta10 = (updates) => {
+                const nextStock = updates.stock !== undefined ? updates.stock : reta10Stock
+                const nextPrice = updates.price !== undefined ? updates.price : reta10Price
+                const nextOrig  = updates.originalPrice !== undefined ? updates.originalPrice : reta10Orig
+                updateAndSaveConfig({
+                  ...config,
+                  products: {
+                    ...config.products,
+                    RETA: {
+                      ...config.products?.RETA,
+                      stock: nextStock,
+                      price: nextPrice,
+                      originalPrice: nextOrig,
+                      dosages: {
+                        ...(config.products?.RETA?.dosages || {}),
+                        '10MG': {
+                          ...(config.products?.RETA?.dosages?.['10MG'] || {}),
+                          stock: nextStock,
+                          price: nextPrice,
+                          originalPrice: nextOrig
+                        },
+                        '20MG': {
+                          ...(config.products?.RETA?.dosages?.['20MG'] || {}),
+                          stock: reta20Stock,
+                          price: reta20Price,
+                          originalPrice: reta20Orig
+                        }
+                      }
+                    }
+                  }
+                })
+              }
+
+              const updateReta20 = (updates) => {
+                const nextStock = updates.stock !== undefined ? updates.stock : reta20Stock
+                const nextPrice = updates.price !== undefined ? updates.price : reta20Price
+                const nextOrig  = updates.originalPrice !== undefined ? updates.originalPrice : reta20Orig
+                updateAndSaveConfig({
+                  ...config,
+                  products: {
+                    ...config.products,
+                    RETA: {
+                      ...config.products?.RETA,
+                      dosages: {
+                        ...(config.products?.RETA?.dosages || {}),
+                        '10MG': {
+                          ...(config.products?.RETA?.dosages?.['10MG'] || {}),
+                          stock: reta10Stock,
+                          price: reta10Price,
+                          originalPrice: reta10Orig
+                        },
+                        '20MG': {
+                          ...(config.products?.RETA?.dosages?.['20MG'] || {}),
+                          stock: nextStock,
+                          price: nextPrice,
+                          originalPrice: nextOrig
+                        }
+                      }
+                    }
+                  }
+                })
+              }
+
+              return (
+                <div>
+                  <div style={{ display: 'grid', gap: '1.4rem' }}>
+                    
+                    {/* RETA 10MG PRODUCT CONTROL */}
+                    <div style={{ padding: '1.2rem', border: '1.5px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div>
+                          <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: 0 }}>RETA (Retatrutide 10mg)</h4>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Dosage standard 10mg</span>
+                        </div>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 900,
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '6px',
+                          background: reta10Stock > 0 ? '#dcfce7' : '#fee2e2',
+                          color: reta10Stock > 0 ? '#15803d' : '#ef4444'
+                        }}>
+                          {reta10Stock > 0 ? `🟢 EN STOCK (${reta10Stock})` : '🔴 RUPTURE DE STOCK'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem' }}>
+                            STOCK DISPONIBLE (UNITÉS)
+                          </label>
+                          <input 
+                            type="number" 
+                            min={0}
+                            value={reta10Stock}
+                            onChange={(e) => updateReta10({ stock: parseInt(e.target.value) || 0 })}
+                            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
+                          />
+                          {/* QUICK STOCK ADJUSTMENT BUTTONS */}
+                          <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.4rem' }}>
+                            {[-5, -1, 1, 5].map(delta => (
+                              <button
+                                key={delta}
+                                type="button"
+                                onClick={() => updateReta10({ stock: Math.max(0, reta10Stock + delta) })}
+                                style={{ flex: 1, padding: '0.25rem', fontSize: '0.68rem', fontWeight: 800, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                              >
+                                {delta > 0 ? `+${delta}` : delta}
+                              </button>
+                            ))}
                             <button
-                              key={delta}
                               type="button"
-                              onClick={() => updateAndSaveConfig({
-                                ...config,
-                                products: {
-                                  ...config.products,
-                                  RETA: { ...config.products.RETA, stock: Math.max(0, config.products.RETA.stock + delta) }
-                                }
-                              })}
-                              style={{ flex: 1, padding: '0.25rem', fontSize: '0.68rem', fontWeight: 800, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                              onClick={() => updateReta10({ stock: 0 })}
+                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.65rem', fontWeight: 800, background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}
                             >
-                              {delta > 0 ? `+${delta}` : delta}
+                              Rupture
                             </button>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => updateAndSaveConfig({
-                              ...config,
-                              products: {
-                                ...config.products,
-                                RETA: { ...config.products.RETA, stock: 0 }
-                              }
-                            })}
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.65rem', fontWeight: 800, background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}
-                          >
-                            Rupture
-                          </button>
+                          </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.4rem' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, marginBottom: '0.3rem' }}>
-                              PRIX DE VENTE (€)
-                            </label>
-                            <input 
-                              type="number" 
-                              value={config.products.RETA.price}
-                              onChange={(e) => updateAndSaveConfig({
-                                ...config,
-                                products: {
-                                  ...config.products,
-                                  RETA: { ...config.products.RETA, price: parseFloat(e.target.value) || 0 }
-                                }
-                              })}
-                              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800 }}
-                            />
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800 }}>
-                                PRIX BARRÉ (€)
+                        <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, marginBottom: '0.3rem' }}>
+                                PRIX DE VENTE (€)
                               </label>
-                              {Boolean(config.products.RETA.originalPrice && config.products.RETA.originalPrice > config.products.RETA.price) && (
-                                <button
-                                  type="button"
-                                  onClick={() => updateAndSaveConfig({
-                                    ...config,
-                                    products: {
-                                      ...config.products,
-                                      RETA: { ...config.products.RETA, originalPrice: 0 }
-                                    }
-                                  })}
-                                  style={{ fontSize: '0.6rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.1rem 0.3rem', cursor: 'pointer' }}
-                                >
-                                  ❌ Enlever
-                                </button>
-                              )}
+                              <input 
+                                type="number" 
+                                value={reta10Price}
+                                onChange={(e) => updateReta10({ price: parseFloat(e.target.value) || 0 })}
+                                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800 }}
+                              />
                             </div>
-                            <input 
-                              type="number" 
-                              value={config.products.RETA.originalPrice || ''}
-                              placeholder="0 (Désactivé)"
-                              onChange={(e) => updateAndSaveConfig({
-                                ...config,
-                                products: {
-                                  ...config.products,
-                                  RETA: { ...config.products.RETA, originalPrice: parseFloat(e.target.value) || 0 }
-                                }
-                              })}
-                              style={{ 
-                                width: '100%', 
-                                padding: '0.6rem', 
-                                borderRadius: '6px', 
-                                border: (config.products.RETA.originalPrice > config.products.RETA.price) ? '1.5px solid #16a34a' : '1px solid #cbd5e1', 
-                                fontSize: '0.85rem', 
-                                fontWeight: 800 
-                              }}
-                            />
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800 }}>
+                                  PRIX BARRÉ (€)
+                                </label>
+                                {Boolean(reta10Orig && reta10Orig > reta10Price) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateReta10({ originalPrice: 0 })}
+                                    style={{ fontSize: '0.6rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.1rem 0.3rem', cursor: 'pointer' }}
+                                  >
+                                    ❌ Enlever
+                                  </button>
+                                )}
+                              </div>
+                              <input 
+                                type="number" 
+                                value={reta10Orig || ''}
+                                placeholder="0 (Désactivé)"
+                                onChange={(e) => updateReta10({ originalPrice: parseFloat(e.target.value) || 0 })}
+                                style={{ 
+                                  width: '100%', 
+                                  padding: '0.6rem', 
+                                  borderRadius: '6px', 
+                                  border: (reta10Orig > reta10Price) ? '1.5px solid #16a34a' : '1px solid #cbd5e1', 
+                                  fontSize: '0.85rem', 
+                                  fontWeight: 800 
+                                }}
+                              />
+                            </div>
                           </div>
+                          <p style={{ fontSize: '0.65rem', color: '#64748b', margin: 0, fontStyle: 'italic' }}>
+                            💡 Mettez 0 ou effacez pour ne PAS afficher de prix barré sur RETA 10mg.
+                          </p>
                         </div>
-                        <p style={{ fontSize: '0.65rem', color: '#64748b', margin: 0, fontStyle: 'italic' }}>
-                          💡 Mettez 0 ou effacez pour ne PAS afficher de prix barré sur RETA.
-                        </p>
                       </div>
                     </div>
-                  </div>
+
+                    {/* RETA 20MG PRODUCT CONTROL */}
+                    <div style={{ padding: '1.2rem', border: '1.5px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div>
+                          <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: 0 }}>RETA (Retatrutide 20mg)</h4>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Haut dosage 20mg</span>
+                        </div>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 900,
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '6px',
+                          background: reta20Stock > 0 ? '#dcfce7' : '#fee2e2',
+                          color: reta20Stock > 0 ? '#15803d' : '#ef4444'
+                        }}>
+                          {reta20Stock > 0 ? `🟢 EN STOCK (${reta20Stock})` : '🔴 RUPTURE DE STOCK'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem' }}>
+                            STOCK DISPONIBLE (UNITÉS)
+                          </label>
+                          <input 
+                            type="number" 
+                            min={0}
+                            value={reta20Stock}
+                            onChange={(e) => updateReta20({ stock: parseInt(e.target.value) || 0 })}
+                            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
+                          />
+                          {/* QUICK STOCK ADJUSTMENT BUTTONS */}
+                          <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.4rem' }}>
+                            {[-5, -1, 1, 5].map(delta => (
+                              <button
+                                key={delta}
+                                type="button"
+                                onClick={() => updateReta20({ stock: Math.max(0, reta20Stock + delta) })}
+                                style={{ flex: 1, padding: '0.25rem', fontSize: '0.68rem', fontWeight: 800, background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                              >
+                                {delta > 0 ? `+${delta}` : delta}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => updateReta20({ stock: 0 })}
+                              style={{ padding: '0.25rem 0.4rem', fontSize: '0.65rem', fontWeight: 800, background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                              Rupture
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, marginBottom: '0.3rem' }}>
+                                PRIX DE VENTE (€)
+                              </label>
+                              <input 
+                                type="number" 
+                                value={reta20Price}
+                                onChange={(e) => updateReta20({ price: parseFloat(e.target.value) || 0 })}
+                                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800 }}
+                              />
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800 }}>
+                                  PRIX BARRÉ (€)
+                                </label>
+                                {Boolean(reta20Orig && reta20Orig > reta20Price) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateReta20({ originalPrice: 0 })}
+                                    style={{ fontSize: '0.6rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.1rem 0.3rem', cursor: 'pointer' }}
+                                  >
+                                    ❌ Enlever
+                                  </button>
+                                )}
+                              </div>
+                              <input 
+                                type="number" 
+                                value={reta20Orig || ''}
+                                placeholder="0 (Désactivé)"
+                                onChange={(e) => updateReta20({ originalPrice: parseFloat(e.target.value) || 0 })}
+                                style={{ 
+                                  width: '100%', 
+                                  padding: '0.6rem', 
+                                  borderRadius: '6px', 
+                                  border: (reta20Orig > reta20Price) ? '1.5px solid #16a34a' : '1px solid #cbd5e1', 
+                                  fontSize: '0.85rem', 
+                                  fontWeight: 800 
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <p style={{ fontSize: '0.65rem', color: '#64748b', margin: 0, fontStyle: 'italic' }}>
+                            💡 Mettez 0 ou effacez pour ne PAS afficher de prix barré sur RETA 20mg.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
                   {/* GHK-Cu PRODUCT CONTROL */}
                   <div style={{ padding: '1.2rem', border: '1.5px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
@@ -1543,15 +1819,27 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                   {/* PACK & OPTIONS CONTROL */}
                   <div style={{ padding: '1.2rem', border: '1.5px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
                     <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: '0 0 1rem 0' }}>OFFRES SPÉCIALES & TARIFS</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem' }}>
-                          PRIX PACK 3 FIOLES RETA (€)
+                          PRIX PACK 3 FIOLES RETA 10MG (€)
                         </label>
                         <input 
                           type="number" 
-                          value={config.pack3Price}
+                          value={config.pack3Price || 150}
                           onChange={(e) => updateAndSaveConfig({ ...config, pack3Price: parseFloat(e.target.value) || 0 })}
+                          style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, marginBottom: '0.3rem' }}>
+                          PRIX PACK 3 FIOLES RETA 20MG (€)
+                        </label>
+                        <input 
+                          type="number" 
+                          value={config.pack3Price20 !== undefined ? config.pack3Price20 : 237.5}
+                          onChange={(e) => updateAndSaveConfig({ ...config, pack3Price20: parseFloat(e.target.value) || 0 })}
                           style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
                         />
                       </div>
@@ -1562,7 +1850,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                         </label>
                         <input 
                           type="number" 
-                          value={config.bacWaterPrice}
+                          value={config.bacWaterPrice || 3}
                           onChange={(e) => updateAndSaveConfig({ ...config, bacWaterPrice: parseFloat(e.target.value) || 0 })}
                           style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800 }}
                         />
@@ -1580,7 +1868,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                   ENREGISTRER TOUS LES STOCKS ET PRIX
                 </button>
               </div>
-            )}
+            )})()}
 
             {/* TAB: PROMO CODES MANAGEMENT */}
             {activeTab === 'promocodes' && (
@@ -1871,8 +2159,9 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                     onChange={(e) => setManualProd(e.target.value)}
                     style={{ width: '100%', padding: '0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.85rem' }}
                   >
-                    <option value="RETA">RETA (10MG)</option>
-                    <option value="GHK-Cu">GHK-Cu (100MG)</option>
+                    <option value="RETA-10MG">RETA (10MG) — {config.products?.RETA?.dosages?.['10MG']?.price || config.products?.RETA?.price || 60}€</option>
+                    <option value="RETA-20MG">RETA (20MG) — {config.products?.RETA?.dosages?.['20MG']?.price || 95}€</option>
+                    <option value="GHK-Cu">GHK-Cu (100MG) — {config.products?.['GHK-Cu']?.price || 50}€</option>
                   </select>
                 </div>
 

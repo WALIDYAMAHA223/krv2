@@ -21,6 +21,7 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
   const setActiveTab = onSelectProduct || (() => {})
 
   const [qty, setQty] = useState(1)
+  const [retaDosage, setRetaDosage] = useState('10MG')
   const [includeBacWater, setIncludeBacWater] = useState(true)
   const [bacWaterQty, setBacWaterQty] = useState(1)
 
@@ -89,27 +90,42 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
   const averageRating = approvedCount > 0 ? (totalStars / approvedCount).toFixed(1) : '5.0'
 
   // Dynamic product config from Admin Dashboard
-  const productData = siteConfig?.products?.[activeTab] || {
-    dosage: activeTab === 'RETA' ? '10MG' : '100MG',
-    price: activeTab === 'RETA' ? 60 : 50,
-    stock: activeTab === 'RETA' ? 20 : 9,
-    description: activeTab === 'RETA'
-      ? 'RETA est un peptide de recherche de haute pureté destiné à l\'étude des mécanismes de régulation métabolique et de lipolyse.'
-      : 'GHK-Cu est un complexe cuivrique hautement dosé destiné à l\'étude de la régénération cutanée et la synthèse du collagène.'
-  }
+  const rawProduct = siteConfig?.products?.[activeTab]
+  const currentDosage = activeTab === 'RETA' ? retaDosage : '100MG'
 
-  const dosage = productData.dosage
-  const singleBasePrice = productData.price
-  const currentStock = productData.stock ?? (activeTab === 'RETA' ? 20 : 9)
+  const dosageConfig = (activeTab === 'RETA' && rawProduct?.dosages?.[currentDosage])
+    ? rawProduct.dosages[currentDosage]
+    : (activeTab === 'RETA' && currentDosage === '20MG')
+      ? { price: 95, originalPrice: 0, stock: 15 }
+      : {
+          price: rawProduct?.price ?? (activeTab === 'RETA' ? 60 : 50),
+          originalPrice: rawProduct?.originalPrice ?? 0,
+          stock: rawProduct?.stock ?? (activeTab === 'RETA' ? 0 : 9)
+        }
+
+  const dosage = currentDosage
+  const singleBasePrice = Number(dosageConfig.price) || (activeTab === 'RETA' ? (currentDosage === '20MG' ? 95 : 60) : 50)
+  const currentStock = dosageConfig.stock !== undefined ? Number(dosageConfig.stock) : 0
   const isOutOfStock = currentStock <= 0
+
+  const productDescription = rawProduct?.description || (activeTab === 'RETA'
+    ? 'RETA est un peptide de recherche de haute pureté destiné à l\'étude des mécanismes de régulation métabolique et de lipolyse.'
+    : 'GHK-Cu est un complexe cuivrique hautement dosé destiné à l\'étude de la régénération cutanée et la synthèse du collagène.')
 
   const bacWaterUnitPrice = siteConfig?.bacWaterPrice || 3
 
   // AUTOMATIC 50% DISCOUNT ON EVERY 3RD VIAL & ORIGINAL PRICE STRIKETHROUGH
-  const originalUnitPrice = (productData.originalPrice && Number(productData.originalPrice) > singleBasePrice) ? Number(productData.originalPrice) : singleBasePrice
+  const originalUnitPrice = (dosageConfig.originalPrice && Number(dosageConfig.originalPrice) > singleBasePrice) 
+    ? Number(dosageConfig.originalPrice) 
+    : singleBasePrice
+
+  const pack3Price = (activeTab === 'RETA' && currentDosage === '20MG')
+    ? (siteConfig?.pack3Price20 !== undefined ? Number(siteConfig.pack3Price20) : (singleBasePrice * 2.5))
+    : (activeTab === 'RETA' ? (siteConfig?.pack3Price !== undefined ? Number(siteConfig.pack3Price) : (singleBasePrice * 2.5)) : (singleBasePrice * 2.5))
+
   const numDiscountedVials = Math.floor(qty / 3)
-  const numFullPriceVials = qty - numDiscountedVials
-  const productTotal = (numFullPriceVials * singleBasePrice) + (numDiscountedVials * singleBasePrice * 0.5)
+  const remainderVials = qty % 3
+  const productTotal = (numDiscountedVials * pack3Price) + (remainderVials * singleBasePrice)
   const unpromotedProductTotal = qty * originalUnitPrice
 
   const hasDiscount = numDiscountedVials > 0 || (originalUnitPrice > singleBasePrice)
@@ -121,29 +137,60 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
   // FLASH SALE — compute discounted unit price if active and applies to this product
   const flashSale = siteConfig?.flashSale
   const flashActive = flashSale?.active && flashSale?.endsAt && new Date(flashSale.endsAt) > new Date()
-  const flashApplies = flashActive && (flashSale.products || []).includes(activeTab)
+
+  const isFlashApplicable = () => {
+    if (!flashActive) return false
+    const prods = flashSale?.products || []
+    if (prods.includes('Tous')) return true
+    if (activeTab === 'RETA') {
+      if (currentDosage === '10MG') {
+        return prods.includes('RETA-10MG') || prods.includes('RETA (10MG)') || prods.includes('RETA')
+      }
+      if (currentDosage === '20MG') {
+        return prods.includes('RETA-20MG') || prods.includes('RETA (20MG)')
+      }
+      return prods.includes('RETA')
+    }
+    if (activeTab === 'GHK-Cu') {
+      return prods.includes('GHK-Cu') || prods.includes('GHK-Cu (100MG)')
+    }
+    return false
+  }
+
+  const flashApplies = isFlashApplicable()
   const flashMinQty = flashSale?.minQty || 1
   const flashQtyOk = flashApplies && qty >= flashMinQty
 
-  // Per-unit flash price
-  const flashUnitPrice = flashQtyOk ? (
+  // Per-unit flash price (computed whenever flash applies to this product/dosage)
+  const flashUnitPrice = flashApplies ? (
     flashSale.discountType === 'percent'
       ? Math.max(0, singleBasePrice * (1 - flashSale.discountValue / 100))
       : flashSale.discountType === 'fixed'
         ? Math.max(0, singleBasePrice - flashSale.discountValue)
         : Math.max(0, flashSale.discountValue) // 'total' mode: total price for minQty, scale per unit
   ) : null
-  // Total flash price for current qty
-  const flashTotalPrice = flashQtyOk ? (flashUnitPrice * qty) + bacWaterCost : null
+
+  // Effective Pack 3 price taking flash sale into account:
+  // 50% discount on the 3rd vial calculated from the flash unit price!
+  const effectivePack3Price = (flashApplies && flashUnitPrice)
+    ? Math.min(pack3Price, flashUnitPrice * 2.5)
+    : pack3Price
+
+  // Total flash price for current qty, INCLUDING pack 3 discount on every 3rd vial!
+  const flashProductTotal = (flashUnitPrice && flashQtyOk)
+    ? (numDiscountedVials * effectivePack3Price) + (remainderVials * flashUnitPrice)
+    : null
+
+  const flashTotalPrice = flashProductTotal !== null ? flashProductTotal + bacWaterCost : null
 
   const handleAdd = () => {
     if (isOutOfStock) return
     onAddToCart({
       name: activeTab,
-      dosage: dosage,
+      dosage: currentDosage,
       qty,
       singleBasePrice,
-      pack3Price: siteConfig?.pack3Price || (singleBasePrice * 2.5),
+      pack3Price: flashApplies ? effectivePack3Price : pack3Price,
       includeBacWater,
       bacWaterQty: includeBacWater ? bacWaterQty : 0,
       bacWaterUnitPrice: bacWaterUnitPrice,
@@ -181,7 +228,7 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
   }
 
   return (
-    <section id="selection" className="selection-section" style={{ background: '#ffffff', padding: '3.5rem 1.5rem', position: 'relative' }}>
+    <section id="selection" className="selection-section" style={{ padding: '3.5rem 1.5rem', position: 'relative' }}>
       <div className="selection-inner" style={{ maxWidth: '1000px', margin: '0 auto' }}>
         
         {/* TAB SWITCHER */}
@@ -293,7 +340,14 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                 {/* LABEL SOUS LE PRIX */}
                 {flashQtyOk ? (
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', marginTop: '0.2rem' }}>
-                    {flashSale.discountType === 'percent' ? `-${flashSale.discountValue}% / FIOLE` : `-${flashSale.discountValue}€ / FIOLE`}
+                    {numDiscountedVials > 0
+                      ? (flashSale.discountType === 'percent'
+                          ? `VENTE FLASH -${flashSale.discountValue}% + 3E FIOLE À -50%`
+                          : `VENTE FLASH -${flashSale.discountValue}€ + 3E FIOLE À -50%`)
+                      : (flashSale.discountType === 'percent'
+                          ? `-${flashSale.discountValue}% / FIOLE`
+                          : `-${flashSale.discountValue}€ / FIOLE`)
+                    }
                   </span>
                 ) : flashApplies && !flashQtyOk ? (
                   <span style={{ fontSize: '0.63rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.2rem' }}>
@@ -357,7 +411,7 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
 
             {/* SHORT DESCRIPTION */}
             <p className="product-text" style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--gray-700)', lineHeight: 1.6, marginBottom: '0.8rem' }}>
-              {productData.description}
+              {productDescription}
             </p>
 
             {/* 3 MINIMAL CHECKMARKS */}
@@ -373,21 +427,69 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                 <p style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.12em', color: 'var(--black)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
                   DOSAGE 🛈
                 </p>
-                <button 
-                  type="button"
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    border: '2px solid var(--black)',
-                    borderRadius: '4px',
-                    background: 'var(--white)',
-                    color: 'var(--black)',
-                    cursor: 'default'
-                  }}
-                >
-                  {dosage}
-                </button>
+                {activeTab === 'RETA' ? (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {['10MG', '20MG'].map((dsg) => {
+                      const isSel = retaDosage === dsg
+                      const dsgStock = rawProduct?.dosages?.[dsg]?.stock ?? (dsg === '20MG' ? 15 : (rawProduct?.stock ?? 0))
+                      const isDsgOos = dsgStock <= 0
+                      return (
+                        <button
+                          key={dsg}
+                          type="button"
+                          onClick={() => setRetaDosage(dsg)}
+                          style={{
+                            padding: '0.5rem 1.15rem',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            letterSpacing: '0.04em',
+                            border: isSel ? '2px solid var(--black)' : '1.5px solid #cbd5e1',
+                            borderRadius: '6px',
+                            background: isSel ? 'var(--black)' : '#ffffff',
+                            color: isSel ? '#ffffff' : 'var(--black)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            boxShadow: isSel ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span>{dsg}</span>
+                          {isDsgOos && (
+                            <span style={{
+                              fontSize: '0.58rem',
+                              fontWeight: 900,
+                              background: isSel ? '#ef4444' : '#fee2e2',
+                              color: isSel ? '#fff' : '#ef4444',
+                              padding: '0.1rem 0.35rem',
+                              borderRadius: '4px',
+                              letterSpacing: '0.02em'
+                            }}>
+                              Épuisé
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <button 
+                    type="button"
+                    style={{
+                      padding: '0.5rem 1.2rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      border: '2px solid var(--black)',
+                      borderRadius: '6px',
+                      background: 'var(--black)',
+                      color: 'var(--white)',
+                      cursor: 'default'
+                    }}
+                  >
+                    100MG
+                  </button>
+                )}
               </div>
 
               <div>
@@ -439,12 +541,26 @@ export default function ProductSelection({ selectedProduct, onSelectProduct, onA
                   alignItems: 'center'
                 }}
               >
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--black)' }}>
-                  PACK 3 FIOLES
-                </span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--black)' }}>
-                  {(singleBasePrice * 2.5).toFixed(2).replace('.', ',')} €
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--black)' }}>
+                    PACK 3 FIOLES
+                  </span>
+                  {flashApplies && (
+                    <span style={{ fontSize: '0.55rem', fontWeight: 900, background: '#fef3c7', color: '#d97706', padding: '0.05rem 0.3rem', borderRadius: '4px' }}>
+                      FLASH
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.2rem' }}>
+                  {flashApplies && effectivePack3Price < pack3Price && (
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', textDecoration: 'line-through', fontWeight: 700 }}>
+                      {pack3Price.toFixed(2).replace('.', ',')} €
+                    </span>
+                  )}
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: flashApplies ? '#d97706' : 'var(--black)' }}>
+                    {effectivePack3Price.toFixed(2).replace('.', ',')} €
+                  </span>
+                </div>
               </div>
 
               {/* EAU BACTÉRIOSTATIQUE CARD */}

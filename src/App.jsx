@@ -48,8 +48,12 @@ const DEFAULT_SITE_CONFIG = {
       dosage: '10MG',
       price: 60,
       originalPrice: 0,
-      stock: 20,
-      description: 'RETA est un peptide de recherche de haute pureté destiné à l\'étude des mécanismes de régulation métabolique et de lipolyse.'
+      stock: 0,
+      description: 'RETA est un peptide de recherche de haute pureté destiné à l\'étude des mécanismes de régulation métabolique et de lipolyse.',
+      dosages: {
+        '10MG': { price: 60, originalPrice: 0, stock: 0 },
+        '20MG': { price: 95, originalPrice: 0, stock: 15 }
+      }
     },
     'GHK-Cu': {
       name: 'GHK-Cu',
@@ -65,6 +69,7 @@ const DEFAULT_SITE_CONFIG = {
     { id: '2', code: 'BIOTECH15', discountType: 'fixed', discountValue: 15, active: true }
   ],
   pack3Price: 150,
+  pack3Price20: 237.5,
   bacWaterPrice: 3,
   whatsappNumber: '32465983104',
   announcement: {
@@ -74,8 +79,64 @@ const DEFAULT_SITE_CONFIG = {
     textColor: '#ffffff',
     linkText: '',
     linkUrl: '#selection'
+  },
+  flashSale: {
+    active: false,
+    label: '',
+    products: [],
+    discountType: 'percent',
+    discountValue: 0,
+    minQty: 1,
+    endsAt: null
   }
 }
+
+export const normalizeSiteConfig = (raw) => {
+  if (!raw) return DEFAULT_SITE_CONFIG
+  const rawReta = raw.products?.RETA || {}
+  const rawGhk = raw.products?.['GHK-Cu'] || {}
+
+  const retaDosage10 = {
+    price: rawReta.dosages?.['10MG']?.price !== undefined ? Number(rawReta.dosages['10MG'].price) : (rawReta.price !== undefined ? Number(rawReta.price) : 60),
+    originalPrice: rawReta.dosages?.['10MG']?.originalPrice !== undefined ? Number(rawReta.dosages['10MG'].originalPrice) : (rawReta.originalPrice !== undefined ? Number(rawReta.originalPrice) : 0),
+    stock: rawReta.dosages?.['10MG']?.stock !== undefined ? Number(rawReta.dosages['10MG'].stock) : (rawReta.stock !== undefined ? Number(rawReta.stock) : 0)
+  }
+
+  const retaDosage20 = {
+    price: rawReta.dosages?.['20MG']?.price !== undefined ? Number(rawReta.dosages['20MG'].price) : 95,
+    originalPrice: rawReta.dosages?.['20MG']?.originalPrice !== undefined ? Number(rawReta.dosages['20MG'].originalPrice) : 0,
+    stock: rawReta.dosages?.['20MG']?.stock !== undefined ? Number(rawReta.dosages['20MG'].stock) : 15
+  }
+
+  return {
+    ...DEFAULT_SITE_CONFIG,
+    ...raw,
+    products: {
+      RETA: {
+        ...DEFAULT_SITE_CONFIG.products.RETA,
+        ...rawReta,
+        price: retaDosage10.price,
+        originalPrice: retaDosage10.originalPrice,
+        stock: retaDosage10.stock,
+        dosages: {
+          '10MG': retaDosage10,
+          '20MG': retaDosage20
+        }
+      },
+      'GHK-Cu': {
+        ...DEFAULT_SITE_CONFIG.products['GHK-Cu'],
+        ...rawGhk
+      }
+    },
+    pack3Price: raw.pack3Price !== undefined ? Number(raw.pack3Price) : 150,
+    pack3Price20: raw.pack3Price20 !== undefined ? Number(raw.pack3Price20) : (retaDosage20.price * 2.5),
+    announcement: { ...DEFAULT_SITE_CONFIG.announcement, ...(raw.announcement || {}) },
+    flashSale: raw.flashSale || DEFAULT_SITE_CONFIG.flashSale,
+    promoCodes: raw.promoCodes || DEFAULT_SITE_CONFIG.promoCodes,
+    whatsappNumber: (raw.whatsappNumber && raw.whatsappNumber !== '33700000000') ? raw.whatsappNumber : '32465983104'
+  }
+}
+
 
 export default function App() {
   const [modalOpen, setModalOpen] = useState(false)
@@ -120,23 +181,13 @@ export default function App() {
     }, 100)
   }
 
-  // Site Config with localStorage persistence
+  // Site Config with localStorage persistence & normalization
   const [siteConfig, setSiteConfig] = useState(() => {
     const saved = localStorage.getItem('kratos_site_config')
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        return {
-          ...DEFAULT_SITE_CONFIG,
-          ...parsed,
-          products: {
-            RETA: { ...DEFAULT_SITE_CONFIG.products.RETA, ...(parsed.products?.RETA || {}) },
-            'GHK-Cu': { ...DEFAULT_SITE_CONFIG.products['GHK-Cu'], ...(parsed.products?.['GHK-Cu'] || {}) }
-          },
-          announcement: { ...DEFAULT_SITE_CONFIG.announcement, ...(parsed.announcement || {}) },
-          promoCodes: parsed.promoCodes || DEFAULT_SITE_CONFIG.promoCodes,
-          whatsappNumber: (parsed.whatsappNumber && parsed.whatsappNumber !== '33700000000') ? parsed.whatsappNumber : '32465983104'
-        }
+        return normalizeSiteConfig(parsed)
       } catch (e) {
         return DEFAULT_SITE_CONFIG
       }
@@ -145,14 +196,15 @@ export default function App() {
   })
 
   const updateSiteConfig = (newConfig) => {
-    setSiteConfig(newConfig)
-    pushCloudState({ siteConfig: newConfig })
+    const normalized = normalizeSiteConfig(newConfig)
+    setSiteConfig(normalized)
+    pushCloudState({ siteConfig: normalized })
   }
 
   // Real-time Cloud Synchronization across PC, Mobile, and all visitors
   useEffect(() => {
     const stopSync = startCloudSyncLoop({
-      onSiteConfig: (newConf) => setSiteConfig(newConf)
+      onSiteConfig: (newConf) => setSiteConfig(normalizeSiteConfig(newConf))
     }, 3000)
     return () => stopSync()
   }, [])

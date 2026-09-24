@@ -19,13 +19,14 @@ const AlertIcon = () => (
 )
 
 export default function DosageCalculator() {
-  const [product, setProduct] = useState('RETA') // RETA (10mg) or GHK-Cu (100mg)
+  const [product, setProduct] = useState('RETA') // RETA or GHK-Cu
+  const [retaVialMg, setRetaVialMg] = useState(10) // 10 or 20
   const [bacWater, setBacWater] = useState(3) // 3 ml default
   const [targetDose, setTargetDose] = useState(2.5) // Target mg
   const [syringeCapacity, setSyringeCapacity] = useState(100) // 30U, 50U, 100U
 
   // Vial total mg
-  const vialMg = product === 'RETA' ? 10 : 100
+  const vialMg = product === 'RETA' ? retaVialMg : 100
 
   // Presets based on product
   const RETA_DOSES = [1, 2, 2.5, 4, 5]
@@ -101,37 +102,68 @@ export default function DosageCalculator() {
               <label style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.1em', color: 'var(--black)', display: 'block', marginBottom: '0.8rem' }}>
                 1. SÉLECTIONNEZ VOTRE FLACON
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
                 <button
                   type="button"
-                  onClick={() => handleProductChange('RETA')}
+                  onClick={() => {
+                    setProduct('RETA')
+                    setRetaVialMg(10)
+                    setTargetDose(2.5)
+                  }}
                   style={{
-                    padding: '0.8rem',
+                    padding: '0.75rem 0.4rem',
                     borderRadius: '8px',
-                    border: product === 'RETA' ? '2px solid var(--black)' : '1px solid var(--gray-300)',
-                    background: product === 'RETA' ? 'var(--black)' : 'var(--white)',
-                    color: product === 'RETA' ? 'var(--white)' : 'var(--black)',
+                    border: (product === 'RETA' && retaVialMg === 10) ? '2px solid var(--black)' : '1px solid var(--gray-300)',
+                    background: (product === 'RETA' && retaVialMg === 10) ? 'var(--black)' : 'var(--white)',
+                    color: (product === 'RETA' && retaVialMg === 10) ? 'var(--white)' : 'var(--black)',
                     fontWeight: 700,
-                    fontSize: '0.82rem',
+                    fontSize: '0.78rem',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    textAlign: 'center'
                   }}
                 >
                   RETA (10mg)
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleProductChange('GHK-Cu')}
+                  onClick={() => {
+                    setProduct('RETA')
+                    setRetaVialMg(20)
+                    setTargetDose(2.5)
+                  }}
                   style={{
-                    padding: '0.8rem',
+                    padding: '0.75rem 0.4rem',
+                    borderRadius: '8px',
+                    border: (product === 'RETA' && retaVialMg === 20) ? '2px solid var(--black)' : '1px solid var(--gray-300)',
+                    background: (product === 'RETA' && retaVialMg === 20) ? 'var(--black)' : 'var(--white)',
+                    color: (product === 'RETA' && retaVialMg === 20) ? 'var(--white)' : 'var(--black)',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'center'
+                  }}
+                >
+                  RETA (20mg)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProduct('GHK-Cu')
+                    setTargetDose(5)
+                  }}
+                  style={{
+                    padding: '0.75rem 0.4rem',
                     borderRadius: '8px',
                     border: product === 'GHK-Cu' ? '2px solid var(--black)' : '1px solid var(--gray-300)',
                     background: product === 'GHK-Cu' ? 'var(--black)' : 'var(--white)',
                     color: product === 'GHK-Cu' ? 'var(--white)' : 'var(--black)',
                     fontWeight: 700,
-                    fontSize: '0.82rem',
+                    fontSize: '0.78rem',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    textAlign: 'center'
                   }}
                 >
                   GHK-Cu (100mg)

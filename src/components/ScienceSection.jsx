@@ -39,10 +39,10 @@ const faqCommentCommander = {
 
 const faqsRETA = [
   faqCommentCommander,
-  { q: "Qu'est-ce que Retatrutide (RETA) ?", a: "Retatrutide (RETA 10mg) est un triple agoniste récepteur ciblant simultanément GLP-1, GIP et Glucagon, offrant des propriétés uniques pour l'étude du métabolisme et de la lipolyse ciblée." },
+  { q: "Qu'est-ce que le Retatrutide (RETA) ?", a: "Le Retatrutide (RETA) est un triple agoniste récepteur ciblant simultanément GLP-1, GIP et Glucagon, offrant des propriétés uniques pour l'étude du métabolisme et de la lipolyse ciblée." },
   { q: "Pourquoi la présence d'Eau Bactériostatique 3ml est-elle obligatoire ?", a: "La fiole d'Eau Bactériostatique 3ml contient 0.9% d'alcool benzylique stérile. Elle est indispensable pour dissoudre le lyophilisat stérile et préserver la stabilité moléculaire des peptides après reconstitution." },
   { q: "Quelle est la différence entre RETA et la Tirzépatide ?", a: "Contrairement à la Tirzépatide (double agoniste), le Retatrutide intègre un 3ème axe récepteur (Glucagon), activant l'oxydation directe des graisses et la dépense énergétique au repos." },
-  { q: "Comment conserver la fiole de RETA 10mg ?", a: "À conserver à l'abri de la lumière entre 2°C et 8°C après reconstitution stérile avec l'eau bactériostatique 3ml fournies." },
+  { q: "Comment conserver la fiole de RETA ?", a: "À conserver à l'abri de la lumière entre 2°C et 8°C après reconstitution stérile avec l'eau bactériostatique 3ml fournie." },
 ]
 
 const faqsGHKCU = [
@@ -143,7 +143,7 @@ export default function ScienceSection() {
             </h3>
             <p className="section-desc" style={{ marginBottom: '1.8rem' }}>
               {activeTab === 'RETA'
-                ? "Retrouvez les détails essentiels sur le Retatrutide 10mg et son protocole de reconstitution stérile avec l'Eau Bactériostatique 3ml."
+                ? "Retrouvez les détails essentiels sur le Retatrutide (RETA) et son protocole de reconstitution stérile avec l'Eau Bactériostatique 3ml."
                 : "Retrouvez les détails essentiels sur le complexe cuivrique GHK-Cu 100mg et sa reconstitution stérile avec l'Eau Bactériostatique 3ml."}
             </p>
           </div>
