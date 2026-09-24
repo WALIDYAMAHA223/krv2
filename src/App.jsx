@@ -68,11 +68,11 @@ const DEFAULT_SITE_CONFIG = {
   bacWaterPrice: 3,
   whatsappNumber: '32465983104',
   announcement: {
-    enabled: true,
-    text: '⚡ OFFRE SPÉCIALE : -50% SUR CHAQUE 3ÈM FIOLE DE GHK-CU & RETA • EXPÉDITION EXPRESS 24/48H',
+    enabled: false,
+    text: '',
     bg: '#0a0a0a',
     textColor: '#ffffff',
-    linkText: 'COMMANDER MAINTENANT ➜',
+    linkText: '',
     linkUrl: '#selection'
   }
 }

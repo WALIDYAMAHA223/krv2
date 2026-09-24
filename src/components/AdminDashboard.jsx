@@ -1099,7 +1099,7 @@ export default function AdminDashboard({ isOpen, onClose, siteConfig, onUpdateCo
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', background: '#ffffff', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                       <input 
                         type="checkbox"
-                        checked={config.announcement?.enabled ?? true}
+                        checked={Boolean(config.announcement?.enabled)}
                         onChange={(e) => updateAndSaveConfig({
                           ...config,
                           announcement: {

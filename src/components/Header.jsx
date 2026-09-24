@@ -70,7 +70,7 @@ export default function Header({ onCartClick, cartCount, siteConfig }) {
   return (
     <header style={{ position: 'sticky', top: 0, zIndex: 100 }}>
       {/* TOP ANNOUNCEMENT BAR FOR PROMOS & NOTICES */}
-      {announcement?.enabled && (
+      {Boolean(announcement?.enabled && announcement?.text?.trim()) && (
         <div 
           className="topbar-announcement"
           style={{
@@ -90,7 +90,7 @@ export default function Header({ onCartClick, cartCount, siteConfig }) {
             transition: 'all 0.3s ease'
           }}
         >
-          <span>{announcement.text || '⚡ OFFRE SPÉCIALE : -50% SUR CHAQUE 3ÈM FIOLE DE GHK-CU & RETA'}</span>
+          <span>{announcement.text}</span>
           {announcement.linkText && (
             <a 
               href={announcement.linkUrl || '#selection'} 
